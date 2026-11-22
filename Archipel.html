@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Archipel</title>
+<style>
+/* VOICE: jeu de plateau calme et lisible, une partie à deux sur un seul téléphone
+   IDEA: une carte d'îles en hexagones, peinte comme un petit plateau de jeu
+   PICTURE: la carte elle-même, plein écran entre une barre d'infos et un tiroir d'actions
+   COLOUR and TYPE: mer bleu pâle, sable, bleu et rouge francs pour les joueurs ; Fredoka
+   LAYOUT: portrait, en-tête fin, carte qui occupe tout, 5 gros boutons en bas */
+:root{--sea:#bcd9e4;--paper:#fbf7ee;--chip:#efe8d8;--ink:#2a3340;--pc:#4f8fe8}
+*{box-sizing:border-box;margin:0;padding:0;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#1d2833;color:var(--ink);font:16px/1.4 Fredoka,ui-rounded,"SF Pro Rounded",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button{font:inherit;color:inherit;cursor:pointer}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:600px;margin:0 auto;background:var(--sea)}
+header{background:var(--paper);padding:calc(6px + env(safe-area-inset-top)) 10px 6px;box-shadow:0 2px 0 rgba(0,0,0,.06);z-index:2}
+.row{display:flex;align-items:center;gap:8px}
+#bMenu{width:44px;height:44px;border:0;border-radius:12px;background:var(--chip);font-size:20px;flex:none}
+#who{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;flex:1;white-space:nowrap;overflow:hidden}
+#who i{width:16px;height:16px;border-radius:50%;background:var(--pc);flex:none;box-shadow:0 0 0 3px rgba(0,0,0,.08)}
+#who small{font-weight:500;font-size:14px;opacity:.6}
+#gold{display:flex;align-items:center;gap:6px;background:var(--chip);border-radius:12px;padding:0 12px;height:44px;font-weight:700;font-size:18px;white-space:nowrap}
+#gold .coin{width:16px;height:16px;border-radius:50%;background:#f2c14e;border:2px solid #c9962a;flex:none}
+#inc{font-size:14px;font-weight:600}
+#inc.neg{color:#c0392b}#inc.pos{color:#2e8b57}
+.chips{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;font-weight:600;flex-wrap:wrap}
+.chip{display:flex;align-items:center;gap:4px;padding:2px 8px 2px 5px;border-radius:999px;background:var(--chip);border:2px solid transparent}
+.chip i{width:12px;height:12px;border-radius:50%}
+.chip small{font-size:10px;opacity:.6;font-weight:600}
+.chip.cur{border-color:var(--ink)}.chip.dead{opacity:.35;text-decoration:line-through}
+.chips.many{gap:4px}.chips.many .chip{padding:2px 6px 2px 4px;font-size:12px}.chips.many .chip small{display:none}
+.chips .goal{margin-left:auto;font-weight:500;opacity:.6;font-size:12px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 4px}
+.slot{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-height:52px;border:0;border-radius:12px;background:var(--chip);padding:6px 10px;font-size:15px;font-weight:600;text-align:left}
+.slot i{width:16px;height:16px;border-radius:50%}
+.slot b{width:100%;font-weight:600;font-size:12px;opacity:.75}
+.slot.lock{opacity:.4}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:6px}
+.grid3 button{min-height:50px;border:0;border-radius:12px;background:var(--chip);font-size:14px;font-weight:600;padding:4px 2px}
+.grid3 button.on{background:#2a3340;color:#fff}.grid3 small{display:block;font-size:10.5px;font-weight:500;opacity:.7}
+.slot.none{opacity:.45}.slot.none b{background:transparent}
+.lbl{font-size:13px;opacity:.6;text-align:left;margin-top:12px}
+#stage{position:relative;flex:1;min-height:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#hint{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(251,247,238,.92);padding:6px 14px;border-radius:999px;font-size:14px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+#toast{position:absolute;bottom:14px;left:50%;transform:translate(-50%,12px);opacity:0;transition:.2s;background:#2a3340;color:#fff;padding:9px 16px;border-radius:12px;font-size:15px;pointer-events:none;max-width:92%;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+footer.sea{grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.15fr);gap:4px}
+footer.sea .tool b{font-size:11px}footer.sea .tool.end{font-size:13px}
+.tool[hidden]{display:none}
+footer{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(0,1.25fr);gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:var(--paper);box-shadow:0 -2px 0 rgba(0,0,0,.06)}
+.tool{border:0;border-radius:14px;background:var(--chip);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:68px;padding:4px 2px;transition:transform .1s}
+.tool:active{transform:scale(.95)}
+.tool canvas{width:30px;height:30px}
+.tool b{font-size:12px;font-weight:600;line-height:1.1}
+.tool em{font-style:normal;font-size:12px;opacity:.75;display:flex;align-items:center;gap:3px}
+.tool em::before{content:"";width:9px;height:9px;border-radius:50%;background:#f2c14e;border:1.5px solid #c9962a}
+.tool.no em::before{display:none}
+.tool.on{background:var(--pc);color:#fff}
+.tool.on em{opacity:1}
+.tool:disabled{opacity:.4}
+.tool.end{background:var(--pc);color:#fff;font-size:15px;font-weight:700}
+.tool .big{font-size:24px;line-height:1}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(18,26,36,.55);z-index:10;padding:20px}
+.ov.on{display:flex}
+.card{background:var(--paper);border-radius:22px;padding:24px 22px;width:100%;max-width:380px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.25);max-height:100%;overflow:auto}
+.card h1{font-size:44px;line-height:1.05;font-weight:700;letter-spacing:.5px}
+.card h2{font-size:30px;line-height:1.1;font-weight:700;margin-bottom:6px}
+.card p{font-size:16px;margin:6px 0}
+.card .sub{opacity:.65;margin-bottom:14px}
+.card .btn{display:block;width:100%;min-height:52px;border:0;border-radius:14px;background:var(--chip);font-size:18px;font-weight:600;margin-top:10px}
+.card .btn.main{background:#4f8fe8;color:#fff}
+.card.stats{padding:0 0 18px;max-width:420px;text-align:left}
+.stats .band{color:#fff;padding:20px 20px 16px;border-radius:22px 22px 0 0;text-align:center}
+.stats .band h2{margin:0}.stats .band p{margin:2px 0 0;opacity:.9}
+.stats .in{padding:0 16px}
+.stats h3{font-size:15px;font-weight:600;margin:16px 0 6px}
+.leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.leg span{display:flex;align-items:center;gap:5px}.leg i{width:14px;height:3px;border-radius:2px}
+.chart{position:relative;height:190px;margin-top:6px;touch-action:none}
+.chart svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.tip{position:absolute;top:0;pointer-events:none;background:#2a3340;color:#fff;font-size:12px;line-height:1.35;padding:6px 8px;border-radius:8px;white-space:nowrap;display:none}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+table.st{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.st th,.st td{padding:6px 3px;border-bottom:1px solid #e6dfcf}
+.st td{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.st td:first-child,.st th:first-child{text-align:left;white-space:normal}
+.st th{font-weight:600;text-align:right;font-size:12px}.st th i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px}
+.st tr.best td.b{font-weight:700}
+.stats .btns{padding:0 16px}
+.tw{overflow-x:auto}
+.mult{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px;margin-top:6px;touch-action:none}
+.mult svg{width:100%;height:64px;display:block;overflow:visible}
+.mh{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;white-space:nowrap}
+.mh span{overflow:hidden;text-overflow:ellipsis;min-width:0}.mh small{font-size:10px;opacity:.6}
+.mh i{width:12px;height:3px;border-radius:2px;flex:none}.mh b{margin-left:auto;font-weight:600;white-space:nowrap}
+.seg{display:flex;gap:6px;margin:14px 0 4px}
+.seg button{flex:1;min-height:46px;border:0;border-radius:12px;background:var(--chip);font-size:15px;font-weight:600}
+.seg button.on{background:#2a3340;color:#fff}
+.seg small{display:block;font-size:11px;font-weight:500;opacity:.7}
+.rules{text-align:left;font-size:15px}
+.rules li{margin:8px 0 8px 18px}
+.hand{color:#fff}.hand .sub{opacity:.85}
+.hand .btn{background:rgba(255,255,255,.22);color:#fff}
+.logo{display:block;margin:0 auto 8px;width:180px;height:110px}
+@media (prefers-reduced-motion:reduce){.tool,#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="row">
+      <button id="bMenu" aria-label="Menu">☰</button>
+      <div id="who"><i></i><span id="pName">Bleu</span><small id="turnNo">Tour 1</small></div>
+      <div id="gold"><span class="coin"></span><span id="goldV">—</span><span id="inc"></span></div>
+    </div>
+    <div class="chips" id="chips"></div>
+  </header>
+  <div id="stage"><canvas id="cv"></canvas><div id="hint">Touchez votre territoire</div><div id="toast"></div></div>
+  <footer>
+    <button class="tool" id="tUnit"><canvas width="60" height="60"></canvas><b>Paysan</b><em>10</em></button>
+    <button class="tool" id="tTower"><canvas width="60" height="60"></canvas><b>Tour</b><em>15</em></button>
+    <button class="tool" id="tFarm"><canvas width="60" height="60"></canvas><b>Ferme</b><em>12</em></button>
+    <button class="tool" id="tPort" hidden><canvas width="60" height="60"></canvas><b>Port</b><em>20</em></button>
+    <button class="tool no" id="tUndo"><span class="big">↶</span><b>Annuler</b></button>
+    <button class="tool end no" id="tEnd"><span class="big">▶</span>Fin du tour</button>
+  </footer>
+</div>
+<div class="ov" id="ov"><div class="card" id="card"></div></div>
+
+<script>
+{
+'use strict';
+/* ═════════ Constantes ═════════ */
+const SQ3=Math.sqrt(3);
+const DIRS=[[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]]; // E, SE, SO, O, NO, NE (= arête k du coin k au coin k+1)
+const CX=[],CY=[];for(let k=0;k<6;k++){const a=Math.PI/180*(60*k-30);CX.push(Math.cos(a));CY.push(Math.sin(a));}
+const UCOST=[0,10,20,30,40],UUP=[0,2,6,18,36],UNAME=['','Paysan','Lancier','Baron','Chevalier'],ROM=['','I','II','III','IV'];
+const TOW={tower:{cost:15,up:1,def:2,name:'Tour'},tower2:{cost:35,up:6,def:3,name:'Forteresse'}};
+const FARM_BASE=12,FARM_STEP=2,FARM_INC=4,START_GOLD=10,PORT_COST=20,PORT_UP=1,SEA_RANGE=6;
+const SIZES={s:[11,17],m:[15,25],l:[19,33]},MAXT={s:40,m:50,l:60};
+const maxT=()=>MAXT[G.size]||60;
+const PL=[{name:'Bleu',line:'#3f7fdc',base:'#4f8fe8',light:'#8ab6f5',dark:'#1f4f97'},{name:'Rouge',line:'#e0533f',base:'#e5604f',light:'#f49a8d',dark:'#97291d'},
+          {name:'Violet',line:'#9466d6',base:'#9a6fd8',light:'#c3a6ee',dark:'#55308f'},{name:'Jaune',line:'#c2870c',base:'#e6ad2e',light:'#f4d27f',dark:'#8c600b'},
+          {name:'Turquoise',line:'#22a383',base:'#3dbb9c',light:'#93dcc9',dark:'#11695a'},{name:'Prune',line:'#962c61',base:'#a9467c',light:'#d898bb',dark:'#5c1a3d'}];
+const NEUTRAL='#ebe3cc',SAVE_KEY='archipel_save_v2';
+
+/* ═════════ État ═════════ */
+let G=null;                 // partie en cours
+let WX,WY;                  // positions monde des cases
+let sel=-1;                 // case d'ancrage de la province sélectionnée
+let selUnit=-1;             // case du soldat sélectionné
+let mode=null;              // {k:'unit'|'tower'|'farm', l:niveau}
+let targets=new Map();      // case -> 'move'|'merge'|'cap'|'build'
+let hints=[];               // cases ennemies trop défendues (affichage du bouclier)
+let undo=[];
+let menuSize='l',cfg={players:['human','ai','ai','human','ai','ai'],teams:false,map:'continent',level:'moyen'};   // 6 places : 5 et 6 réservées à la grande carte
+let aiTimer=0,aiFast=false,aiSteps=0;
+const cam={s:20,ox:0,oy:0};
+
+/* ═════════ Grille ═════════ */
+function makeGrid(C,R){
+  const H=[];
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)H.push({c,r,q:c-(r>>1),land:false,owner:-1,unit:0,ready:false,b:'',money:0,tree:false,iso:0});
+  return {C,R,H,nb:buildNb(C,R,H)};
+}
+const NP=6;
+const present=()=>[0,1,2,3,4,5].filter(p=>G.players[p]&&G.players[p]!=='none');
+const isAI=p=>G.players[p]==='ai';
+const team=p=>G.teams?(G.players[p]==='human'?0:1):p;
+const isCap=t=>t==='cap'||t==='scap';             // prise par terre ou par débarquement
+const coastal=j=>G.nb[j].some(n=>n>=0&&!G.H[n].land);
+const foe=(o,p)=>o<0||team(o)!==team(p);       // case neutre ou adverse = prenable
+const goal=()=>{const n=present().length;return G.teams||n===2?0.6:n<=4?0.5:0.4;};
+const newStats=()=>[0,1,2,3,4,5].map(()=>({cap:0,towns:0,kills:0,bought:0,lost:0,gold:0,farms:0,towers:0,ports:0,lands:0,peak:0}));
+function record(){const c=counts();G.hist.push({t:G.turn,c});c.forEach((v,p)=>{G.st[p].peak=Math.max(G.st[p].peak,v);});}
+function buildNb(C,R,H){
+  return H.map(h=>DIRS.map(([dq,dr])=>{const r2=h.r+dr;if(r2<0||r2>=R)return -1;const c2=h.q+dq+(r2>>1);if(c2<0||c2>=C)return -1;return r2*C+c2;}));
+}
+function calcPos(){
+  WX=G.H.map(h=>SQ3*(h.c+(h.r&1)/2));WY=G.H.map(h=>1.5*h.r);
+}
+
+/* ═════════ Génération de carte (symétrie en miroir = équitable) ═════════ */
+function startSpots(C,R,n){
+  const at=(c,r)=>r*C+c,cm=C>>1,cL=Math.round(C*0.22),cR=C-1-cL;
+  if(n===2)return [at(cm,R-3),at(cm,2)];
+  if(n===3)return [at(cm,R-4),at(cL,3),at(cR,3)];
+  if(n===4)return [at(cL,R-4),at(cL,3),at(cR,3),at(cR,R-4)];   // bas-gauche, haut-gauche, haut-droite, bas-droite
+  // 5-6 joueurs : en anneau (bas, bas-gauche, haut-gauche, haut, haut-droite, bas-droite), chacun entre deux voisins
+  const l=Math.round(C*0.16),r2=C-1-l,rU=Math.round(R/3),rD=R-1-rU;
+  const ring=[at(cm,R-4),at(l,rD),at(l,rU),at(cm,3),at(r2,rU),at(r2,rD)];
+  return n===6?ring:[ring[0],ring[1],ring[2],ring[4],ring[5]];
+}
+function genGame(key,conf){
+  const [C,R]=SIZES[key],pres=[0,1,2,3,4,5].filter(p=>conf.players[p]&&conf.players[p]!=='none'&&(p<4||key==='l'));
+  const mixed=pres.some(p=>conf.players[p]==='human')&&pres.some(p=>conf.players[p]==='ai');
+  // Types de carte : continent, archipel (îles), lacs, atoll (anneau autour d'une mer intérieure), forêt (arbres denses)
+  const MT=conf.map||(conf.sea?'archipel':'continent'),isl=MT==='archipel',seaMode=isl||MT==='atoll';
+  const WATER={continent:.3,archipel:.5,lacs:.3,atoll:.45,foret:.3}[MT],MINLAND={continent:.5,archipel:.33,lacs:.5,atoll:.4,foret:.5}[MT];
+  for(let att=0;att<400;att++){
+    const g=makeGrid(C,R),H=g.H,nb=g.nb,N=H.length;
+    const fold=h=>Math.min(h.r,R-1-h.r)*C+Math.min(h.c,C-1-h.c);
+    const base=Array.from({length:N},Math.random),tb=Array.from({length:N},Math.random);
+    let v=new Float64Array(N);for(let i=0;i<N;i++)v[i]=base[fold(H[i])];
+    for(let it=0;it<(isl||MT==='lacs'?2:3);it++){const nv=new Float64Array(N);for(let i=0;i<N;i++){let s=v[i]*1.5,w=1.5;for(const n of nb[i])if(n>=0){s+=v[n];w++;}nv[i]=s/w;}v=nv;}
+    for(let i=0;i<N;i++){const h=H[i],e=Math.min(h.c,C-1-h.c,h.r,R-1-h.r);
+      if(MT==='lacs'){if(e<2)v[i]+=(2-e)*0.08;}                      // bords pleins : l'eau reste à l'intérieur, en lacs
+      else if(e<2)v[i]-=(2-e)*0.06;}
+    if(MT==='atoll'){                                                // anneau de terre autour d'une mer intérieure
+      const cx=SQ3*(C-0.5)/2,cy=1.5*(R-1)/2,rx=SQ3*C/2,ry=1.5*R/2;
+      for(let i=0;i<N;i++){const h=H[i],dx=(SQ3*(h.c+(h.r&1)/2)-cx)/rx,dy=(1.5*h.r-cy)/ry;v[i]=0.3*v[i]-Math.abs(Math.hypot(dx,dy)-0.78);}
+    }
+    const sorted=[...v].sort((a,b)=>a-b),th=sorted[Math.floor(N*WATER)];
+    for(let i=0;i<N;i++)H[i].land=v[i]>th;
+    if(isl){   // chenaux de mer entre les camps : chacun démarre sur son île
+      const mr=(R-1)/2,mc=(C-1)/2,n=pres.length;
+      if(n<=4)for(const h of H){if(h.r===mr)h.land=false;if(h.c===mc&&n>=3&&(h.r<mr||n===4))h.land=false;}
+      else{const b1=Math.round(R*0.15);   // zones haut/bas (5 rangées pleine largeur) ≈ zones latérales (10 rangées demi-largeur)
+        for(const h of H){if(h.r===b1||h.r===mr||h.r===R-1-b1)h.land=false;if(h.c===mc&&h.r>b1&&h.r<R-1-b1)h.land=false;}}
+    }
+    const spots=startSpots(C,R,pres.length),F=new Set();
+    spots.forEach(sp=>[sp,...nb[sp]].forEach(n=>{if(n>=0)F.add(n);}));
+    if(F.size<7*spots.length)continue;
+    F.forEach(i=>H[i].land=true);
+    let landN=0;
+    if(!isl){
+      const seen=new Uint8Array(N),q=[spots[0]];seen[spots[0]]=1;
+      for(let k=0;k<q.length;k++)for(const n of nb[q[k]])if(n>=0&&!seen[n]&&H[n].land){seen[n]=1;q.push(n);}
+      if(!spots.every(sp=>seen[sp]))continue;
+      for(let i=0;i<N;i++){if(!seen[i])H[i].land=false;if(H[i].land)landN++;}
+      if(landN<N*MINLAND)continue;
+    }else{
+      // îlots de moins de 3 cases noyés ; île de départ d'au moins 12 cases ; au moins 2 îles neutres
+      const comp=new Int32Array(N).fill(-1),sizes=[];
+      for(let i=0;i<N;i++){if(!H[i].land||comp[i]>=0)continue;const id=sizes.length,q=[i];comp[i]=id;
+        for(let k=0;k<q.length;k++)for(const n of nb[q[k]])if(n>=0&&comp[n]<0&&H[n].land){comp[n]=id;q.push(n);}sizes.push(q.length);}
+      for(let i=0;i<N;i++)if(H[i].land&&sizes[comp[i]]<3)H[i].land=false;
+      const startC=new Set(spots.map(sp=>comp[sp]));
+      if(startC.size<spots.length||spots.some(sp=>sizes[comp[sp]]<12))continue;
+      const neutral=sizes.filter((z,id)=>z>=4&&!startC.has(id)).length;
+      if(neutral<2)continue;
+      for(let i=0;i<N;i++)if(H[i].land)landN++;
+      if(landN<N*0.33)continue;
+    }
+    const TREES=MT==='foret'?0.3:0.07;
+    for(let i=0;i<N;i++)if(H[i].land&&!F.has(i)&&tb[fold(H[i])]<TREES)H[i].tree=true;
+    spots.forEach((sp,k)=>{const p=pres[k];[sp,...nb[sp]].forEach(i=>{H[i].owner=p;H[i].tree=false;});H[sp].b='town';H[sp].money=START_GOLD;});
+    return {C,R,H,nb,landN,cur:pres[0],turn:1,over:false,size:key,players:conf.players.map((x,p)=>pres.includes(p)?x:'none'),teams:conf.teams&&mixed,map:MT,sea:seaMode,level:conf.level||'moyen',last:null,st:newStats(),hist:[]};
+  }
+  throw new Error('carte');
+}
+
+/* ═════════ Provinces ═════════ */
+function computeProvs(){
+  const H=G.H,N=H.length,po=new Int32Array(N).fill(-1),provs=[];
+  for(let i=0;i<N;i++){
+    const h=H[i];if(!h.land||h.owner<0||po[i]>=0)continue;
+    const id=provs.length,p=h.owner,list=[i];po[i]=id;
+    for(let k=0;k<list.length;k++)for(const n of G.nb[list[k]])if(n>=0&&po[n]<0&&H[n].land&&H[n].owner===p){po[n]=id;list.push(n);}
+    let town=-1;for(const j of list)if(H[j].b==='town'){town=j;break;}
+    provs.push({id,p,hexes:list,town});
+  }
+  G.provs=provs;G.provOf=po;
+}
+function placeTown(pr){
+  const H=G.H,tiers=[j=>!H[j].b&&!H[j].unit&&!H[j].tree,j=>!H[j].b&&!H[j].unit,j=>!H[j].unit,()=>true];
+  for(const f of tiers){
+    const c=pr.hexes.filter(f);if(!c.length)continue;
+    const inner=c.filter(j=>G.nb[j].every(n=>n>=0&&H[n].land&&H[n].owner===pr.p));
+    const pool=inner.length?inner:c,j=pool[Math.floor(Math.random()*pool.length)];
+    Object.assign(H[j],{b:'town',money:0,tree:false,unit:0,ready:false});return;
+  }
+}
+function fixProvinces(){
+  computeProvs();
+  const H=G.H;
+  for(const pr of G.provs){
+    const towns=pr.hexes.filter(j=>H[j].b==='town');
+    if(pr.hexes.length<2)towns.forEach(t=>{H[t].b='';H[t].money=0;});
+    else if(!towns.length)placeTown(pr);
+    else if(towns.length>1){
+      towns.sort((a,b)=>H[b].money-H[a].money);
+      let sum=0;towns.forEach(t=>sum+=H[t].money);
+      towns.slice(1).forEach(t=>{H[t].b='';H[t].money=0;});H[towns[0]].money=sum;
+    }
+  }
+  computeProvs();
+}
+const provAt=i=>i>=0&&G.provOf[i]>=0?G.provs[G.provOf[i]]:null;
+function provIncome(pr){
+  let s=0;
+  for(const j of pr.hexes){const h=G.H[j];if(!h.tree)s+=1;if(h.b==='farm')s+=FARM_INC;s-=UUP[h.unit];if(TOW[h.b])s-=TOW[h.b].up;if(h.b==='port')s-=PORT_UP;}
+  return s;
+}
+const farmCost=pr=>FARM_BASE+FARM_STEP*pr.hexes.filter(j=>G.H[j].b==='farm').length;
+
+/* ═════════ Défense & cibles ═════════ */
+function defOne(h){let d=h.unit;if(h.b==='town'||h.b==='port')d=Math.max(d,1);if(TOW[h.b])d=Math.max(d,TOW[h.b].def);return d;}
+function defense(i){
+  const h=G.H[i];if(h.owner<0)return 0;let d=defOne(h);
+  for(const n of G.nb[i])if(n>=0&&G.H[n].land&&G.H[n].owner===h.owner)d=Math.max(d,defOne(G.H[n]));
+  return d;
+}
+const canBeat=(L,i)=>{const d=defense(i);return L>d||L===4;};
+
+// Traversée immédiate : depuis un port de la province, jusqu'à SEA_RANGE cases de mer, puis débarquement.
+function seaTargets(pr,L,T){
+  if(!G.sea||!pr)return;
+  const H=G.H,ports=pr.hexes.filter(j=>H[j].b==='port');if(!ports.length)return;
+  const dist=new Map(),q=[];
+  for(const pt of ports)for(const n of G.nb[pt])if(n>=0&&!H[n].land&&!dist.has(n)){dist.set(n,1);q.push(n);}
+  for(let k=0;k<q.length;k++){
+    const a=q[k],d=dist.get(a);
+    for(const n of G.nb[a]){
+      if(n<0)continue;const hn=H[n];
+      if(!hn.land){if(d<SEA_RANGE&&!dist.has(n)){dist.set(n,d+1);q.push(n);}continue;}
+      if(T.has(n))continue;
+      if(hn.owner===pr.p){if(G.provOf[n]!==pr.id&&!hn.b&&!hn.unit)T.set(n,'sail');}
+      else if(foe(hn.owner,pr.p)&&canBeat(L,n))T.set(n,'scap');
+    }
+  }
+}
+function unitTargets(i){
+  const H=G.H,h=H[i],L=h.unit,p=h.owner,pid=G.provOf[i],T=new Map(),dist=new Map([[i,0]]),q=[i],near=new Set();
+  for(let k=0;k<q.length;k++){
+    const a=q[k],d=dist.get(a);if(d>3)continue;
+    for(const n of G.nb[a]){
+      if(n<0||!H[n].land)continue;
+      if(H[n].owner===p&&G.provOf[n]===pid){if(!dist.has(n)){dist.set(n,d+1);q.push(n);}}
+      else if(foe(H[n].owner,p)){if(canBeat(L,n))T.set(n,'cap');else near.add(n);}
+    }
+  }
+  for(const [j] of dist){if(j===i)continue;const hj=H[j];if(hj.b)continue;if(!hj.unit)T.set(j,'move');else if(hj.unit+L<=4)T.set(j,'merge');}
+  hints=[...near].filter(n=>!T.has(n));
+  seaTargets(provAt(i),L,T);
+  return T;
+}
+function buyTargets(pr){
+  const H=G.H,T=new Map(),near=new Set();hints=[];
+  if(!pr||pr.town<0||!mode)return T;
+  const cost=modeCost(pr);if(H[pr.town].money<cost)return T;
+  for(const j of pr.hexes){
+    const h=H[j];
+    if(mode.k==='unit'){
+      if(!h.b){if(!h.unit)T.set(j,'move');else if(h.unit+mode.l<=4)T.set(j,'merge');}
+      for(const n of G.nb[j])if(n>=0&&H[n].land&&foe(H[n].owner,pr.p)){if(canBeat(mode.l,n))T.set(n,'cap');else near.add(n);}
+    }else if(mode.k==='tower'){
+      if(!h.unit&&!h.tree&&(!h.b||(mode.l===2&&h.b==='tower')))T.set(j,'build');
+    }else if(mode.k==='port'){
+      if(!h.b&&!h.unit&&!h.tree&&coastal(j))T.set(j,'build');
+    }else if(mode.k==='farm'){
+      if(!h.b&&!h.unit&&!h.tree&&G.nb[j].some(n=>n>=0&&G.provOf[n]===pr.id&&(H[n].b==='town'||H[n].b==='farm')))T.set(j,'build');
+    }
+  }
+  hints=[...near].filter(n=>!T.has(n));
+  if(mode.k==='unit')seaTargets(pr,mode.l,T);
+  return T;
+}
+function modeCost(pr){
+  if(!mode)return 0;
+  if(mode.k==='unit')return UCOST[mode.l];
+  if(mode.k==='tower')return mode.l===2?TOW.tower2.cost:TOW.tower.cost;
+  if(mode.k==='port')return PORT_COST;
+  return pr?farmCost(pr):FARM_BASE;
+}
+
+/* ═════════ Actions ═════════ */
+function snap(){return JSON.stringify({c:G.H.map(h=>[h.owner,h.unit,h.ready?1:0,h.b,h.money,h.tree?1:0,h.iso||0]),sel,st:G.st});}
+function restore(s){const o=JSON.parse(s);o.c.forEach((a,i)=>{const h=G.H[i];[h.owner,h.unit,h.ready,h.b,h.money,h.tree,h.iso]=[a[0],a[1],!!a[2],a[3],a[4],!!a[5],a[6]||0];});sel=o.sel;if(o.st)G.st=o.st;computeProvs();}
+function capture(n,L,p,bySea){const h=G.H[n],S=G.st[p];S.cap++;if(bySea)S.lands++;if(h.owner>=0){if(h.b==='town')S.towns++;if(h.unit)S.kills++;}Object.assign(G.H[n],{owner:p,unit:L,ready:false,b:'',money:0,tree:false,iso:0});}
+
+function moveUnit(i,j,type){
+  undo.push(snap());
+  const H=G.H,L=H[i].unit;H[i].unit=0;H[i].ready=false;
+  if(isCap(type)){capture(j,L,G.cur,type==='scap');sel=j;}
+  else if(type==='merge'){H[j].unit+=L;}
+  else{H[j].unit=L;H[j].ready=false;H[j].tree=false;}
+  fixProvinces();after();
+}
+function buy(j,type){
+  const pr=provAt(sel);if(!pr||pr.town<0)return;
+  const cost=modeCost(pr),H=G.H;
+  if(H[pr.town].money<cost){toast("Pas assez d'or (il faut "+cost+')');return;}
+  undo.push(snap());
+  H[pr.town].money-=cost;
+  const S=G.st[G.cur];if(mode.k==='unit')S.bought++;else if(mode.k==='farm')S.farms++;else if(mode.k==='port')S.ports++;else S.towers++;
+  if(mode.k==='unit'){
+    if(isCap(type)){capture(j,mode.l,G.cur,type==='scap');sel=j;}
+    else if(type==='sail'){H[j].unit=mode.l;H[j].ready=false;H[j].tree=false;}
+    else if(type==='merge')H[j].unit+=mode.l;
+    else{H[j].unit=mode.l;H[j].ready=!H[j].tree;H[j].tree=false;}
+  }else if(mode.k==='tower')H[j].b=mode.l===2?'tower2':'tower';
+  else if(mode.k==='port')H[j].b='port';
+  else H[j].b='farm';
+  fixProvinces();
+  const keep=mode.k!=='unit'&&type==='build';
+  after(keep);
+}
+function after(keepMode){
+  selUnit=-1;
+  if(!keepMode)mode=null;
+  if(sel>=0&&G.H[sel].owner!==G.cur)sel=-1;
+  refreshTargets();checkWin();save();ui();
+}
+function refreshTargets(){
+  hints=[];
+  if(selUnit>=0)targets=unitTargets(selUnit);
+  else if(mode)targets=buyTargets(provAt(sel));
+  else targets=new Map();
+}
+
+/* ═════════ Tours ═════════ */
+function spreadTrees(){
+  const H=G.H,list=[];H.forEach((h,i)=>{if(h.tree)list.push(i);});
+  for(const i of list){
+    if(Math.random()>0.1)continue;
+    const c=G.nb[i].filter(n=>n>=0&&H[n].land&&!H[n].tree&&!H[n].b&&!H[n].unit);
+    if(c.length)H[c[Math.floor(Math.random()*c.length)]].tree=true;
+  }
+}
+// Alertes : provinces qui feront faillite au début du prochain tour de leur joueur, soldats isolés condamnés.
+let warns=[];
+// Faillite proportionnelle : on licencie juste assez de soldats pour couvrir le déficit, en perdant le moins possible.
+// Tant qu'il reste à couvrir : le soldat le moins cher qui suffit à lui seul ; sinon le plus cher, et on recommence.
+function layoffPlan(pr,deficit){
+  const units=pr.hexes.filter(j=>G.H[j].unit>0).map(j=>({j,up:UUP[G.H[j].unit]})),out=[];
+  let d=deficit;
+  while(d>0&&units.length){
+    units.sort((a,b)=>a.up-b.up);
+    let k=units.findIndex(u=>u.up>=d);if(k<0)k=units.length-1;
+    d-=units[k].up;out.push(units[k].j);units.splice(k,1);
+  }
+  return out;
+}
+function willFail(pr){return pr.town>=0&&G.H[pr.town].money+provIncome(pr)<0&&pr.hexes.some(j=>G.H[j].unit>0);}
+function refreshWarns(){
+  warns=[];if(!G)return;
+  for(const pr of G.provs){
+    if(willFail(pr))warns.push({j:pr.town,k:'fail',n:layoffPlan(pr,-(G.H[pr.town].money+provIncome(pr))).length});
+    else if(pr.hexes.length===1){const h=G.H[pr.hexes[0]];if(h.unit&&h.iso>=1)warns.push({j:pr.hexes[0],k:'iso',n:1});}
+  }
+}
+function beginTurn(){
+  const p=G.cur,rep={inc:0,lost:0,iso:0,gold:0};
+  if(p===0&&G.turn>1)spreadTrees();
+  computeProvs();
+  for(const pr of G.provs){
+    if(pr.p!==p||pr.town<0)continue;
+    const t=G.H[pr.town],inc=provIncome(pr);t.money+=inc;rep.inc+=inc;if(inc>0)G.st[p].gold+=inc;
+    if(t.money<0){
+      const plan=layoffPlan(pr,-t.money);t.money=0;
+      for(const j of plan){const h=G.H[j];rep.lost++;G.st[p].lost++;h.unit=0;h.ready=false;if(!h.b)h.tree=true;}
+    }
+    rep.gold+=t.money;
+  }
+  // Isolement : un soldat seul sur sa case tient un tour ; s'il est encore seul au début du tour suivant, il meurt.
+  for(const pr of G.provs){
+    if(pr.p!==p)continue;
+    for(const j of pr.hexes){
+      const h=G.H[j];
+      if(pr.hexes.length>1||!h.unit){h.iso=0;continue;}
+      if(h.iso>=1){rep.iso++;G.st[p].lost++;h.unit=0;h.iso=0;if(!h.b)h.tree=true;}
+      else h.iso=1;
+    }
+  }
+  G.H.forEach(h=>{if(h.owner===p)h.ready=h.unit>0;});
+  G.acts=0;
+  undo=[];selUnit=-1;mode=null;targets=new Map();hints=[];
+  // sélection automatique de la plus grande province
+  let best=null;for(const pr of G.provs)if(pr.p===p&&pr.town>=0&&(!best||pr.hexes.length>best.hexes.length))best=pr;
+  sel=best?best.town:-1;
+  return rep;
+}
+function endTurn(){
+  if(!G||G.over)return;
+  clearTimeout(aiTimer);
+  let nx=G.cur;
+  for(let k=1;k<=NP;k++){const c=(G.cur+k)%NP;if(G.players[c]&&G.players[c]!=='none'&&alive(c)){nx=c;break;}}
+  if(nx<=G.cur){G.turn++;record();if(G.turn>maxT()){G.turn=maxT();checkWin(true);return;}}
+  G.cur=nx;G.__warned=false;
+  const rep=beginTurn();
+  if(checkWin())return;
+  save();
+  if(isAI(G.cur)){sel=-1;ui();startAI();return;}
+  ui();centerOn(sel);humanStart(rep);
+}
+function myWarns(){refreshWarns();const w=warns.filter(x=>G.H[x.j].owner===G.cur);return w.length?' ⚠ '+w.length+' alerte'+(w.length>1?'s':'')+' (pastille rouge)':'';}
+function humanStart(rep){
+  const now=counts(),last=G.last;G.last=now;save();
+  const d=last?present().filter(p=>p!==G.cur).map(p=>PL[p].name+' '+(now[p]-last[p]>=0?'+':'')+(now[p]-last[p])).join(' · '):'';
+  if(present().filter(p=>!isAI(p)).length>=2||!last)handoff(rep,d);
+  else{hide();toast('À vous'+(rep?' · revenu '+(rep.inc>=0?'+':'')+rep.inc:'')+(rep&&rep.lost?' · faillite : '+rep.lost+' licencié'+(rep.lost>1?'s':''):'')+(rep&&rep.iso?' · '+rep.iso+' isolé'+(rep.iso>1?'s':'')+' perdu'+(rep.iso>1?'s':''):'')+myWarns());}
+}
+function counts(){const c=[0,0,0,0,0,0];for(const h of G.H)if(h.land&&h.owner>=0)c[h.owner]++;return c;}
+function alive(p){return G.provs.some(pr=>pr.p===p&&pr.town>=0)||G.H.some(h=>h.owner===p&&h.unit>0);}
+function checkWin(limit){
+  if(G.over)return true;
+  const c=counts(),pres=present(),tot=new Map();
+  pres.forEach(p=>tot.set(team(p),(tot.get(team(p))||0)+c[p]));
+  const liveT=new Set(pres.filter(alive).map(team));
+  let w=null;
+  for(const [t,v] of tot)if(v>=goal()*G.landN)w=t;
+  if(limit&&w===null){let bv=-1;for(const [t,v] of tot)if(liveT.has(t)&&v>bv){bv=v;w=t;}G.limit=true;}   // limite de tours : le plus grand territoire gagne
+  if(liveT.size===1)w=[...liveT][0];
+  if(w===null)return false;
+  G.over=true;G.winTeam=w;record();clearTimeout(aiTimer);try{localStorage.removeItem(SAVE_KEY);}catch(e){}
+  sel=-1;selUnit=-1;mode=null;targets=new Map();hints=[];
+  ui();setTimeout(showWin,400);return true;
+}
+
+/* ═════════ Ordinateur (niveau moyen) ═════════
+   À chaque étape il réévalue tout et joue le meilleur coup :
+   1. prendre une case avec un soldat déjà prêt
+   2. acheter : soldat pour prendre une case, tour si une frontière est menacée, ferme
+   3. replacer les soldats inactifs (couper un arbre, garder la frontière)        */
+// Poids de l'ordinateur : toutes les notes sont réglables (et optimisées par tournoi).
+const AIW0={nNeu:6,nFoe:10,town:25,townGoldMax:30,farm:8,tower:10,tower2:14,kill:4,tree:-1,own:1.5,join:12,split:10,
+  lvlUse:0.5,capMin:4,lvlCost:3,buyMin:3,budget:3,risk:0,
+  twFix:0,twBase:3,twCov:2,twRich:4,twMinCov:2,
+  farmBase:5,farmSlope:0.25,farmLow:2,portFull:12,portFew:6,
+  twEcon:0,lOwn:2,lNeu:3,lNeuFew:-1,lFoe:-8,lThreat:-8,posFoe:1.5,posLvl:1,posNeu:0.3,posTree:6,moveMin:1.5};
+// Poids optimisés par tournoi évolutif (des milliers de parties simulées contre AIW0) :
+//  - Bâtisseur : construit 4 à 7 tours par partie, gagne ~64 % contre AIW0
+//  - Équilibré : plus offensif, ~1,7 tour par partie, gagne ~80 % contre AIW0
+const AIW_B={nNeu:3.99,nFoe:21.36,town:35.34,townGoldMax:32.92,farm:11.58,tower:2.42,tower2:2.46,kill:1.4,tree:-1.27,own:1.74,join:42.93,split:3.64,lvlUse:0.53,capMin:2.09,lvlCost:4.47,buyMin:1.05,budget:7.37,risk:2.18,twFix:1,twBase:5.11,twCov:2.98,twRich:2.08,twMinCov:1,farmBase:3.99,farmSlope:0.34,farmLow:1.04,portFull:3.47,portFew:7.67,lOwn:0.63,lNeu:3.17,lNeuFew:-1.2,lFoe:-9.37,lThreat:-1.76,posFoe:1.45,posLvl:1.01,posNeu:0.61,posTree:3.11,moveMin:1.62,twEcon:1};
+const AIW_E={nNeu:3.51,nFoe:20.78,town:37.11,townGoldMax:44.78,farm:12.72,tower:2.35,tower2:3.37,kill:1.19,tree:-1.59,own:1.69,join:26.27,split:9.43,lvlUse:0.5,capMin:1.77,lvlCost:4.01,buyMin:1.7,budget:8,risk:2.18,twFix:1,twBase:3.87,twCov:2.37,twRich:2.99,twMinCov:1,farmBase:3.99,farmSlope:0.29,farmLow:1.04,portFull:2.75,portFew:4.81,lOwn:0.88,lNeu:3.86,lNeuFew:-1.63,lFoe:-8.43,lThreat:-2.33,posFoe:2.45,posLvl:1.06,posNeu:0.92,posTree:4.3,moveMin:1.81,twEcon:0};
+let AIW=null,HEADLESS=false;
+const aiStyle=p=>present().filter(isAI).indexOf(p)%2===0?'b':'e';      // 1er ordinateur bâtisseur, 2e équilibré, etc.
+const STYLE={b:'bâtisseur',e:'équilibré'};
+const styleName=p=>G.level==='facile'?'facile':G.level==='difficile'?'difficile':STYLE[aiStyle(p)];   // HEADLESS : parties simulées sans affichage (tournois)
+// Facile : poids d'origine + bruit sur les notes + 5 actions max par tour ; Moyen : 2 styles ; Difficile : optimisé contre le Moyen
+const AIW_F=Object.assign({},AIW0,{noise:7,maxActs:5});
+// Difficile : optimisé par tournoi contre les deux styles du Moyen, sur les 5 types de carte
+let AIW_D={nNeu:3.62,nFoe:21.67,town:25.26,townGoldMax:40.27,farm:15.86,tower:8.02,tower2:14.29,kill:4.6,tree:-1.04,own:1.58,join:18.91,split:4.54,lvlUse:1.52,capMin:2.61,lvlCost:3.34,buyMin:1.21,budget:8,risk:8.52,twFix:0,twBase:2.13,twCov:1.64,twRich:4.36,twMinCov:1,farmBase:6.42,farmSlope:0.66,farmLow:0.95,portFull:2.9,portFew:4.35,lOwn:0.85,lNeu:2.77,lNeuFew:-0.69,lFoe:-7.33,lThreat:-2.12,posFoe:2.31,posLvl:1.03,posNeu:2.12,posTree:10.47,moveMin:0.5,twEcon:0};
+const wOf=p=>(G.aiw&&G.aiw[p])||AIW||(G.level==='facile'?AIW_F:G.level==='difficile'?AIW_D:(aiStyle(p)==='b'?AIW_B:AIW_E));
+function capScore(n,p,W,L){
+  const H=G.H,h=H[n];let s=h.owner<0?W.nNeu:W.nFoe;
+  if(h.b==='town')s+=W.town+Math.min(W.townGoldMax,h.money);else if(h.b==='farm')s+=W.farm;else if(h.b==='tower')s+=W.tower;else if(h.b==='tower2')s+=W.tower2;
+  if(h.unit)s+=W.kill*h.unit;if(h.tree)s+=W.tree;
+  const mine=new Set();let own=0,cover=0;
+  for(const a of G.nb[n])if(a>=0&&H[a].land&&H[a].owner===p){own++;mine.add(G.provOf[a]);cover=Math.max(cover,defOne(H[a]));}
+  s+=W.own*own+W.join*Math.max(0,mine.size-1);            // compact, et relie mes provinces
+  if(h.owner>=0){                                         // couper une province adverse en deux
+    let runs=0;for(let k=0;k<6;k++){const a=G.nb[n][k],b=G.nb[n][(k+1)%6];
+      const ia=a>=0&&H[a].land&&H[a].owner===h.owner,ib=b>=0&&H[b].land&&H[b].owner===h.owner;if(!ia&&ib)runs++;}
+    if(runs>=2)s+=W.split*(runs-1);
+  }
+  if(W.risk&&L){const t=threatAt(n,p);if(t>Math.max(L,cover)||t===4)s-=W.risk;}   // case reprise au tour suivant ?
+  return s;
+}
+function threatAt(j,p){
+  const H=G.H;let t=0;
+  for(const a of G.nb[j]){if(a<0||!H[a].land)continue;
+    if(H[a].owner>=0&&foe(H[a].owner,p))t=Math.max(t,H[a].unit);
+    for(const b of G.nb[a])if(b>=0&&H[b].land&&H[b].owner>=0&&foe(H[b].owner,p))t=Math.max(t,H[b].unit);}
+  return t;
+}
+// Menace économique : une province ennemie voisine peut acheter un soldat et attaquer dans le même tour.
+function econThreat(j,p){
+  const H=G.H;let t=0;const seen=new Set();
+  for(const a of G.nb[j]){if(a<0||!H[a].land)continue;
+    for(const b of [a,...G.nb[a]]){if(b<0||!H[b].land||H[b].owner<0||!foe(H[b].owner,p))continue;
+      const pr=provAt(b);if(!pr||pr.town<0||seen.has(pr.id))continue;seen.add(pr.id);
+      t=Math.max(t,Math.min(3,Math.floor((H[pr.town].money+Math.max(0,provIncome(pr)))/10)));}}
+  if(G.sea&&coastal(j)){                // débarquement possible depuis un port ennemi proche
+    const hj=H[j];
+    for(let k=0;k<H.length;k++){const h=H[k];if(h.b!=='port'||!foe(h.owner,p))continue;
+      const dq=h.q-hj.q,dr=h.r-hj.r;if((Math.abs(dq)+Math.abs(dr)+Math.abs(dq+dr))/2>SEA_RANGE+2)continue;
+      const pr=provAt(k);if(!pr||pr.town<0||seen.has(pr.id))continue;seen.add(pr.id);
+      t=Math.max(t,Math.min(3,Math.floor((H[pr.town].money+Math.max(0,provIncome(pr)))/10)));}
+  }
+  return t;
+}
+function bestTower(pr,p,W){
+  const H=G.H,money=H[pr.town].money,inc=provIncome(pr);let best=null;
+  for(const j of pr.hexes){
+    const h=H[j];if(h.b||h.unit||h.tree)continue;
+    const thr=W.twEcon?Math.max(threatAt(j,p),econThreat(j,p)):threatAt(j,p);if(!thr||thr>=4)continue;
+    // une tour (défense 2) arrête les niveaux 1 et 2 ; la forteresse (défense 3) arrête le niveau 3
+    const l=W.twFix?(thr>=3?2:1):(thr>=2?2:1),k=l===2?'tower2':'tower';
+    if(l===2&&(money<TOW.tower2.cost||inc<8))continue;
+    if(defense(j)>=TOW[k].def)continue;
+    let cov=0,rich=0;
+    for(const a of [j,...G.nb[j]]){
+      if(a<0||!H[a].land||H[a].owner!==p)continue;
+      const weak=W.twFix?thr>defense(a):defense(a)<thr+(a===j?1:0);
+      if(weak){cov++;if(H[a].b==='town'||H[a].b==='farm')rich=1;}
+    }
+    if(cov<W.twMinCov)continue;
+    const val=W.twBase+W.twCov*cov+W.twRich*rich;
+    if(!best||val>best.val)best={j,l,val};
+  }
+  return best;
+}
+function posScore(j,p,W){
+  const H=G.H;let s=H[j].tree?W.posTree:0;
+  for(const n of G.nb[j]){if(n<0||!H[n].land)continue;const o=H[n].owner;if(o>=0&&foe(o,p))s+=W.posFoe+W.posLvl*H[n].unit;else if(o<0)s+=W.posNeu;}
+  return s;
+}
+// Débarquer : coloniser une île neutre ou renforcer une tête de pont, pas se jeter seul sur une île ennemie.
+function landScore(j,p,L,W){
+  const H=G.H,h=H[j];let own=0,neu=0;
+  for(const n of G.nb[j])if(n>=0&&H[n].land){if(H[n].owner===p)own++;else if(H[n].owner<0)neu++;}
+  let s;
+  if(own)s=W.lOwn;
+  else if(h.owner<0)s=neu>=2?W.lNeu:W.lNeuFew;
+  else s=h.b==='town'?0:W.lFoe;
+  if(threatAt(j,p)>=L)s+=W.lThreat;
+  return s;
+}
+// Port : utile surtout quand l'île est pleine ; placé là où la mer mène au plus de terres à prendre.
+function bestPort(pr,p,W){
+  const H=G.H,front=new Set();
+  for(const j of pr.hexes)for(const n of G.nb[j])if(n>=0&&H[n].land&&foe(H[n].owner,p))front.add(n);
+  const base=front.size===0?W.portFull:front.size<3?W.portFew:0;if(base<=0)return null;
+  let best=null;
+  for(const j of pr.hexes){
+    const h=H[j];if(h.b||h.unit||h.tree||!coastal(j))continue;
+    const dist=new Map(),q=[],reach=new Set();
+    for(const n of G.nb[j])if(n>=0&&!H[n].land){dist.set(n,1);q.push(n);}
+    for(let k=0;k<q.length;k++){const a=q[k],d=dist.get(a);
+      for(const n of G.nb[a]){if(n<0)continue;if(!H[n].land){if(d<SEA_RANGE&&!dist.has(n)){dist.set(n,d+1);q.push(n);}}else if(foe(H[n].owner,p))reach.add(n);}}
+    if(reach.size&&(!best||reach.size>best.r))best={j,r:reach.size};
+  }
+  return best?{j:best.j,sc:base}:null;
+}
+function aiStep(){
+  const p=G.cur,H=G.H,W=wOf(p);
+  if(W.maxActs&&(G.acts||0)>=W.maxActs)return false;
+  const nz=()=>W.noise?(Math.random()-0.5)*2*W.noise:0;
+  G.acts=(G.acts||0)+1;
+  // 1. captures avec les soldats prêts
+  let b=null;
+  for(let i=0;i<H.length;i++){
+    const h=H[i];if(h.owner!==p||!h.unit||!h.ready)continue;
+    const doomed=h.iso>=1&&G.provs[G.provOf[i]].hexes.length===1;   // soldat isolé : le sauver en priorité
+    for(const [j,t] of unitTargets(i)){if(!isCap(t))continue;const sc=capScore(j,p,W,h.unit)-h.unit*W.lvlUse+(t==='scap'?landScore(j,p,h.unit,W):0)+(doomed?8:0)+nz();if(!b||sc>b.sc)b={i,j,t,sc};}
+  }
+  if(b&&b.sc>=W.capMin){sel=b.i;moveUnit(b.i,b.j,b.t);return true;}
+  // 2. achats
+  let bp=null;
+  for(const pr of G.provs){
+    if(pr.p!==p||pr.town<0)continue;
+    const money=H[pr.town].money,inc=provIncome(pr);sel=pr.town;
+    for(let l=1;l<=4;l++){
+      if(money<UCOST[l])break;
+      const ni=inc+1-UUP[l];if(!(ni>=0||(money-UCOST[l])+W.budget*ni>=0))continue;   // ne pas se ruiner
+      mode={k:'unit',l};
+      for(const [j,t] of buyTargets(pr)){
+        if(!isCap(t)||(l>1&&canBeat(l-1,j)))continue;      // le niveau le plus bas suffisant
+        const sc=capScore(j,p,W,l)-l*W.lvlCost+(t==='scap'?landScore(j,p,l,W):0)+nz();if(!bp||sc>bp.sc)bp={town:pr.town,m:{k:'unit',l},j,t,sc};
+      }
+    }
+    if(money>=TOW.tower.cost&&inc>=2){const tw=bestTower(pr,p,W);if(tw&&(!bp||tw.val>bp.sc))bp={town:pr.town,m:{k:'tower',l:tw.l},j:tw.j,t:'build',sc:tw.val};}
+    if(G.sea&&money>=PORT_COST+5&&!pr.hexes.some(j=>H[j].b==='port')){
+      const pt=bestPort(pr,p,W);if(pt&&(!bp||pt.sc>bp.sc))bp={town:pr.town,m:{k:'port',l:1},j:pt.j,t:'build',sc:pt.sc};
+    }
+    const fc=farmCost(pr);
+    if(money>=fc&&pr.hexes.length>=5){
+      mode={k:'farm',l:1};let fj=-1,fs=-1;
+      for(const [j] of buyTargets(pr)){const inner=G.nb[j].filter(n=>n>=0&&H[n].land&&H[n].owner===p).length-threatAt(j,p)*2;if(inner>fs){fs=inner;fj=j;}}
+      const sc=W.farmBase-(fc-FARM_BASE)*W.farmSlope+(inc<2?W.farmLow:0);
+      if(fj>=0&&(!bp||sc>bp.sc))bp={town:pr.town,m:{k:'farm',l:1},j:fj,t:'build',sc};
+    }
+  }
+  mode=null;
+  if(bp&&bp.sc>=W.buyMin){sel=bp.town;mode=bp.m;buy(bp.j,bp.t);mode=null;return true;}
+  // 3. replacer les soldats inactifs
+  let bm=null;
+  for(let i=0;i<H.length;i++){
+    const h=H[i];if(h.owner!==p||!h.unit||!h.ready)continue;const here=posScore(i,p,W);
+    for(const [j,t] of unitTargets(i)){if(t!=='move')continue;const sc=posScore(j,p,W)-here;if(sc>W.moveMin&&(!bm||sc>bm.sc))bm={i,j,sc};}
+  }
+  if(bm){sel=bm.i;moveUnit(bm.i,bm.j,'move');return true;}
+  return false;
+}
+let aiBeat=0;
+function startAI(){clearTimeout(aiTimer);aiFast=false;aiSteps=0;aiBeat=Date.now();aiTimer=setTimeout(aiTick,450);}
+function aiTick(){
+  aiBeat=Date.now();
+  if(!G||G.over||!isAI(G.cur))return;
+  if(ov.classList.contains('on')){aiTimer=setTimeout(aiTick,250);return;}
+  let n=0;
+  for(;;){
+    let did=false;
+    try{did=aiSteps<300&&aiStep();}
+    catch(err){did=false;report(err);}             // une erreur ne doit jamais figer la partie
+    aiSteps++;
+    sel=-1;selUnit=-1;mode=null;targets=new Map();hints=[];
+    if(G.over)return;
+    if(!did){ui();aiTimer=setTimeout(safeEnd,aiFast?80:380);return;}
+    if(!aiFast||++n>400)break;
+  }
+  ui();aiTimer=setTimeout(aiTick,aiFast?0:170);
+}
+function safeEnd(){aiBeat=Date.now();try{endTurn();}catch(err){report(err);}}
+// chien de garde : si le tour d'un ordinateur ne progresse plus (appli mise en pause, minuteur perdu), on le relance
+function aiWatch(){
+  if(G&&!G.over&&isAI(G.cur)&&!ov.classList.contains('on')&&Date.now()-aiBeat>2500){clearTimeout(aiTimer);aiTick();}
+}
+setInterval(aiWatch,1500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){aiBeat=0;aiWatch();}});
+window.addEventListener('pageshow',()=>{aiBeat=0;aiWatch();});
+
+/* ═════════ Sauvegarde locale ═════════ */
+function save(){
+  if(!G||G.over||HEADLESS)return;
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({C:G.C,R:G.R,size:G.size,cur:G.cur,turn:G.turn,players:G.players,teams:G.teams,sea:G.sea,map:G.map,level:G.level,last:G.last,hist:G.hist,land:G.H.map(h=>h.land?1:0).join(''),s:snap()}));}catch(e){}
+}
+function loadSave(){
+  try{
+    const o=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(!o)return null;
+    const g=makeGrid(o.C,o.R);[...o.land].forEach((ch,i)=>g.H[i].land=ch==='1');
+    return {o,g};
+  }catch(e){return null;}
+}
+function hasSave(){try{return !!localStorage.getItem(SAVE_KEY);}catch(e){return false;}}
+
+/* ═════════ Caméra & rendu ═════════ */
+const cv=document.getElementById('cv');let ctx=cv.getContext('2d');
+let VW=0,VH=0,dpr=1;
+function resize(){
+  const r=cv.getBoundingClientRect();dpr=Math.min(window.devicePixelRatio||1,2);
+  VW=r.width;VH=r.height;cv.width=Math.round(VW*dpr);cv.height=Math.round(VH*dpr);clampCam();
+}
+function bounds(){return {x0:-SQ3/2,x1:SQ3*G.C,y0:-1,y1:1.5*(G.R-1)+1};}
+function sLimits(){const b=bounds();return [Math.min(VW/(b.x1-b.x0),VH/(b.y1-b.y0))*0.92,80];}
+function clampCam(){
+  if(!G||!VW)return;
+  const [a,z]=sLimits();cam.s=Math.max(a,Math.min(z,cam.s));const b=bounds(),s=cam.s;
+  const ax=(o,a0,a1,V)=>(a1-a0)*s<=V*0.9?V/2-(a0+a1)/2*s:Math.min(V*0.12-a0*s,Math.max(V*0.88-a1*s,o));
+  cam.ox=ax(cam.ox,b.x0,b.x1,VW);cam.oy=ax(cam.oy,b.y0,b.y1,VH);
+}
+function centerOn(i,whole){
+  if(!G||!VW)return;
+  cam.s=whole?sLimits()[0]:Math.max(sLimits()[0],VW/(SQ3*9.5));
+  if(i<0){const b=bounds();cam.ox=VW/2-(b.x0+b.x1)/2*cam.s;cam.oy=VH/2-(b.y0+b.y1)/2*cam.s;}
+  else{cam.ox=VW/2-WX[i]*cam.s;cam.oy=VH/2-WY[i]*cam.s;}
+  clampCam();
+}
+function hexAt(sx,sy){
+  const wx=(sx-cam.ox)/cam.s,wy=(sy-cam.oy)/cam.s,rf=wy/1.5,qf=wx/SQ3-rf/2,yf=-qf-rf;
+  let rx=Math.round(qf),rz=Math.round(rf),ry=Math.round(yf);
+  const dx=Math.abs(rx-qf),dy=Math.abs(ry-yf),dz=Math.abs(rz-rf);
+  if(dx>dy&&dx>dz)rx=-ry-rz;else if(dy>dz)ry=-rx-rz;else rz=-rx-ry;
+  const r=rz;if(r<0||r>=G.R)return -1;const c=rx+(r>>1);if(c<0||c>=G.C)return -1;
+  return r*G.C+c;
+}
+function hexPath(x,y,s){ctx.moveTo(x+CX[0]*s,y+CY[0]*s);for(let k=1;k<6;k++)ctx.lineTo(x+CX[k]*s,y+CY[k]*s);ctx.closePath();}
+function seg(x,y,k,s){const k2=(k+1)%6;ctx.moveTo(x+CX[k]*s,y+CY[k]*s);ctx.lineTo(x+CX[k2]*s,y+CY[k2]*s);}
+
+/* Dessins (espace écran, centre x,y, rayon s) */
+function dTree(x,y,s){
+  ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.ellipse(x,y+.36*s,.3*s,.09*s,0,0,7);ctx.fill();
+  ctx.fillStyle='#7a5636';ctx.fillRect(x-.05*s,y+.12*s,.1*s,.24*s);
+  ctx.fillStyle='#2f7a4e';ctx.beginPath();ctx.moveTo(x-.36*s,y+.18*s);ctx.lineTo(x,y-.2*s);ctx.lineTo(x+.36*s,y+.18*s);ctx.fill();
+  ctx.fillStyle='#45a067';ctx.beginPath();ctx.moveTo(x-.27*s,y-.04*s);ctx.lineTo(x,y-.46*s);ctx.lineTo(x+.27*s,y-.04*s);ctx.fill();
+}
+function dTown(x,y,s,P){
+  ctx.fillStyle='rgba(0,0,0,.14)';ctx.beginPath();ctx.ellipse(x,y+.38*s,.42*s,.1*s,0,0,7);ctx.fill();
+  ctx.fillStyle='#fbf5e6';ctx.strokeStyle=P.dark;ctx.lineWidth=Math.max(1,.05*s);
+  ctx.beginPath();ctx.rect(x-.32*s,y-.06*s,.64*s,.44*s);ctx.fill();ctx.stroke();
+  ctx.fillStyle=P.dark;ctx.beginPath();ctx.moveTo(x-.44*s,y-.02*s);ctx.lineTo(x,y-.46*s);ctx.lineTo(x+.44*s,y-.02*s);ctx.closePath();ctx.fill();
+  ctx.fillRect(x-.08*s,y+.12*s,.16*s,.26*s);
+}
+function dFarm(x,y,s){
+  ctx.fillStyle='rgba(0,0,0,.1)';ctx.beginPath();ctx.ellipse(x,y+.34*s,.42*s,.09*s,0,0,7);ctx.fill();
+  ctx.fillStyle='#efcf6b';ctx.strokeStyle='#b98f2c';ctx.lineWidth=Math.max(1,.045*s);
+  ctx.beginPath();ctx.moveTo(x-.42*s,y+.3*s);ctx.lineTo(x-.28*s,y-.24*s);ctx.lineTo(x+.28*s,y-.24*s);ctx.lineTo(x+.42*s,y+.3*s);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();for(const f of [-.06,.12])ctx.moveTo(x-.36*s+(f+.24)*.14*s,y+f*s),ctx.lineTo(x+.36*s-(f+.24)*.14*s,y+f*s);ctx.stroke();
+}
+function dTower(x,y,s,P,big){
+  const w=big?.3:.22,t=big?-.46:-.3;
+  ctx.fillStyle='rgba(0,0,0,.14)';ctx.beginPath();ctx.ellipse(x,y+.38*s,(w+.1)*s,.09*s,0,0,7);ctx.fill();
+  ctx.fillStyle=big?'#767d88':'#a1a7b0';ctx.strokeStyle='#4d535c';ctx.lineWidth=Math.max(1,.045*s);
+  ctx.beginPath();ctx.rect(x-w*s,y+t*s,2*w*s,(.38-t)*s);ctx.fill();ctx.stroke();
+  const m=w*2/5;for(let k=0;k<3;k++){ctx.beginPath();ctx.rect(x-w*s+k*2*m*s,y+(t-.12)*s,m*s,.12*s);ctx.fill();ctx.stroke();}
+  ctx.fillStyle='#3b4049';ctx.fillRect(x-.05*s,y+(t+.14)*s,.1*s,.16*s);
+  if(big){ctx.strokeStyle='#3b4049';ctx.beginPath();ctx.moveTo(x,y+(t-.12)*s);ctx.lineTo(x,y+(t-.42)*s);ctx.stroke();ctx.fillStyle=P.base;ctx.beginPath();ctx.moveTo(x,y+(t-.42)*s);ctx.lineTo(x+.24*s,y+(t-.34)*s);ctx.lineTo(x,y+(t-.26)*s);ctx.fill();}
+}
+function dUnit(x,y,s,P,L,ready,t,ph){
+  const b=ready?-Math.abs(Math.sin(t*3.2+ph))*.1*s:0;
+  ctx.fillStyle='rgba(0,0,0,.16)';ctx.beginPath();ctx.ellipse(x,y+.4*s,.3*s,.08*s,0,0,7);ctx.fill();
+  y+=b;
+  ctx.fillStyle=P.dark;ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.2,.07*s);
+  ctx.beginPath();ctx.moveTo(x-.34*s,y+.38*s);ctx.quadraticCurveTo(x-.34*s,y-.06*s,x,y-.06*s);ctx.quadraticCurveTo(x+.34*s,y-.06*s,x+.34*s,y+.38*s);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.arc(x,y-.24*s,.18*s,0,7);ctx.fill();ctx.stroke();
+  if(L===4){ctx.fillStyle='#f2c14e';ctx.beginPath();ctx.moveTo(x-.16*s,y-.36*s);ctx.lineTo(x-.16*s,y-.54*s);ctx.lineTo(x-.06*s,y-.44*s);ctx.lineTo(x,y-.58*s);ctx.lineTo(x+.06*s,y-.44*s);ctx.lineTo(x+.16*s,y-.54*s);ctx.lineTo(x+.16*s,y-.36*s);ctx.closePath();ctx.fill();}
+  if(s>9){ctx.fillStyle='#fff';ctx.font='700 '+Math.round(.3*s)+'px Fredoka,system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ROM[L],x,y+.2*s);}
+}
+function dPort(x,y,s,P){
+  ctx.fillStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.ellipse(x,y+.34*s,.44*s,.09*s,0,0,7);ctx.fill();
+  ctx.fillStyle='#8a6440';ctx.fillRect(x-.44*s,y+.12*s,.5*s,.12*s);
+  ctx.fillRect(x-.38*s,y+.12*s,.06*s,.24*s);ctx.fillRect(x-.08*s,y+.12*s,.06*s,.24*s);
+  ctx.fillStyle='#5b3d24';ctx.beginPath();ctx.moveTo(x-.02*s,y+.04*s);ctx.lineTo(x+.46*s,y+.04*s);ctx.lineTo(x+.36*s,y+.2*s);ctx.lineTo(x+.08*s,y+.2*s);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#3b2a1a';ctx.lineWidth=Math.max(1,.04*s);ctx.beginPath();ctx.moveTo(x+.2*s,y+.04*s);ctx.lineTo(x+.2*s,y-.44*s);ctx.stroke();
+  ctx.fillStyle=P.base;ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1,.045*s);
+  ctx.beginPath();ctx.moveTo(x+.23*s,y-.42*s);ctx.lineTo(x+.23*s,y-.02*s);ctx.lineTo(x+.46*s,y-.02*s);ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x+.17*s,y-.32*s);ctx.lineTo(x+.17*s,y-.02*s);ctx.lineTo(x-.02*s,y-.02*s);ctx.closePath();ctx.fill();ctx.stroke();
+}
+function dWarn(x,y,s,t){
+  const r=Math.max(8,.24*s)*(1+.08*Math.sin(t*6));
+  ctx.fillStyle='#d93025';ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,r*.18);
+  ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#fff';ctx.font='700 '+Math.round(r*1.35)+'px Fredoka,system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',x,y+1);
+}
+function dShield(x,y,s,d){
+  const r=Math.max(7,.22*s);
+  ctx.fillStyle='rgba(42,51,64,.85)';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='700 '+Math.round(r*1.2)+'px Fredoka,system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(d,x,y+1);
+}
+
+function draw(){
+  try{drawFrame();}catch(err){report(err);}
+  requestAnimationFrame(draw);
+}
+function drawFrame(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle='#bcd9e4';ctx.fillRect(0,0,VW,VH);
+  if(!G)return;
+  const t=performance.now()/1000,s=cam.s,H=G.H,nb=G.nb,vis=[],XS=[],YS=[];
+  for(let i=0;i<H.length;i++){
+    if(!H[i].land)continue;const x=WX[i]*s+cam.ox,y=WY[i]*s+cam.oy;
+    if(x<-s*2||x>VW+s*2||y<-s*2||y>VH+s*2)continue;vis.push(i);XS[i]=x;YS[i]=y;
+  }
+  // rivage
+  ctx.beginPath();for(const i of vis)for(let k=0;k<6;k++){const n=nb[i][k];if(n<0||!H[n].land)seg(XS[i],YS[i],k,s);}
+  ctx.lineCap='round';ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=s*.42;ctx.stroke();
+  // cases
+  const sp=provAt(sel),spid=sp?sp.id:-1;
+  ctx.lineWidth=1;ctx.strokeStyle='rgba(70,55,30,.12)';
+  for(const i of vis){
+    const h=H[i];ctx.beginPath();hexPath(XS[i],YS[i],s);
+    ctx.fillStyle=h.owner<0?NEUTRAL:(G.provOf[i]===spid&&h.owner===G.cur?PL[h.owner].light:PL[h.owner].base);
+    ctx.fill();ctx.stroke();
+  }
+  // frontières
+  ctx.beginPath();for(const i of vis)for(let k=0;k<6;k++){const n=nb[i][k];if(n>i&&H[n].land&&H[n].owner!==H[i].owner&&(H[n].owner>=0||H[i].owner>=0))seg(XS[i],YS[i],k,s);}
+  ctx.strokeStyle='rgba(25,30,40,.5)';ctx.lineWidth=Math.max(1.5,s*.08);ctx.stroke();
+  ctx.beginPath();for(const i of vis)for(let k=0;k<6;k++){const n=nb[i][k];if(n<0||!H[n].land)seg(XS[i],YS[i],k,s);}
+  ctx.strokeStyle='#86aebd';ctx.lineWidth=Math.max(1,s*.06);ctx.stroke();
+  // contour de la province sélectionnée
+  if(sp&&sp.p===G.cur){
+    ctx.beginPath();for(const j of sp.hexes){if(XS[j]===undefined)continue;for(let k=0;k<6;k++){const n=nb[j][k];if(n<0||G.provOf[n]!==spid)seg(XS[j],YS[j],k,s);}}
+    ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(2,s*.13);ctx.stroke();
+  }
+  // cibles
+  const pulse=.3+.14*Math.sin(t*5);
+  for(const [j,ty] of targets){
+    if(XS[j]===undefined)continue;
+    ctx.beginPath();hexPath(XS[j],YS[j],s*.9);
+    ctx.fillStyle=isCap(ty)?'rgba(255,255,255,'+(pulse+.1)+')':'rgba(255,255,255,'+pulse+')';ctx.fill();
+    if(isCap(ty)){ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1.5,s*.08);ctx.setLineDash([s*.18,s*.12]);ctx.stroke();ctx.setLineDash([]);}
+  }
+  // contenu
+  for(const i of vis){
+    const h=H[i],x=XS[i],y=YS[i],P=h.owner>=0?PL[h.owner]:PL[0];
+    if(h.tree)dTree(x,y,s);
+    if(h.b==='town')dTown(x,y,s,P);else if(h.b==='farm')dFarm(x,y,s);else if(h.b==='tower')dTower(x,y,s,P,false);else if(h.b==='tower2')dTower(x,y,s,P,true);else if(h.b==='port')dPort(x,y,s,P);
+    if(h.unit)dUnit(x,y,s,P,h.unit,h.ready&&h.owner===G.cur&&!G.over,t,i*.7);
+  }
+  if(selUnit>=0&&XS[selUnit]!==undefined){ctx.beginPath();ctx.arc(XS[selUnit],YS[selUnit],s*.7,0,7);ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(2,s*.1);ctx.stroke();}
+  for(const j of hints)if(XS[j]!==undefined)dShield(XS[j]+s*.42,YS[j]-s*.42,s,defense(j));
+  for(const w of warns)if(XS[w.j]!==undefined)dWarn(XS[w.j]-s*.42,YS[w.j]-s*.48,s,t);
+}
+
+/* ═════════ Entrées tactiles ═════════ */
+const ptrs=new Map();let gest=null;
+function pos(e){const r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+function pinchStart(){const [a,b]=[...ptrs.values()],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;gest={k:'pinch',d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:cam.s,wx:(mx-cam.ox)/cam.s,wy:(my-cam.oy)/cam.s};}
+cv.addEventListener('pointerdown',e=>{
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  const p=pos(e);ptrs.set(e.pointerId,p);
+  if(ptrs.size===1)gest={k:'pan',sx:p.x,sy:p.y,lx:p.x,ly:p.y,moved:false};
+  else if(ptrs.size===2)pinchStart();
+});
+cv.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)||!gest)return;const p=pos(e);ptrs.set(e.pointerId,p);
+  if(gest.k==='pan'){
+    if(!gest.moved&&Math.hypot(p.x-gest.sx,p.y-gest.sy)>9)gest.moved=true;
+    if(gest.moved){cam.ox+=p.x-gest.lx;cam.oy+=p.y-gest.ly;clampCam();}
+    gest.lx=p.x;gest.ly=p.y;
+  }else if(gest.k==='pinch'&&ptrs.size>=2){
+    const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    const [lo,hi]=sLimits();cam.s=Math.max(lo,Math.min(hi,gest.s0*d/gest.d0));
+    cam.ox=mx-gest.wx*cam.s;cam.oy=my-gest.wy*cam.s;clampCam();
+  }
+});
+function pEnd(e,cancel){
+  if(!ptrs.has(e.pointerId))return;const p=ptrs.get(e.pointerId);
+  if(!cancel&&gest&&gest.k==='pan'&&!gest.moved&&ptrs.size===1)tap(p.x,p.y);
+  ptrs.delete(e.pointerId);
+  if(ptrs.size===1){const q=[...ptrs.values()][0];gest={k:'pan',sx:q.x,sy:q.y,lx:q.x,ly:q.y,moved:true};}
+  else if(ptrs.size===0)gest=null;
+}
+cv.addEventListener('pointerup',e=>pEnd(e,false));
+cv.addEventListener('pointercancel',e=>pEnd(e,true));
+cv.addEventListener('wheel',e=>{
+  e.preventDefault();if(!G)return;const p=pos(e),wx=(p.x-cam.ox)/cam.s,wy=(p.y-cam.oy)/cam.s,[lo,hi]=sLimits();
+  cam.s=Math.max(lo,Math.min(hi,cam.s*Math.exp(-e.deltaY*.0015)));cam.ox=p.x-wx*cam.s;cam.oy=p.y-wy*cam.s;clampCam();
+},{passive:false});
+
+function tap(x,y){
+  if(!G||G.over)return;
+  if(isAI(G.cur)){if(!aiFast){aiFast=true;toast('Accéléré');}if(Date.now()-aiBeat>1200){clearTimeout(aiTimer);aiTick();}return;}
+  const i=hexAt(x,y),h=i>=0?G.H[i]:null;
+  if(!h||!h.land){selUnit=-1;mode=null;refreshTargets();ui();return;}
+  if(targets.has(i)){
+    const ty=targets.get(i);
+    if(selUnit>=0)moveUnit(selUnit,i,ty);else if(mode)buy(i,ty);
+    return;
+  }
+  if(h.owner===G.cur){
+    if(h.unit&&h.iso>=1&&G.provs[G.provOf[i]].hexes.length===1)toast('Soldat isolé : il meurt au prochain tour s\'il reste seul');
+    if(h.unit&&h.ready&&i!==selUnit){sel=i;selUnit=i;mode=null;refreshTargets();ui();return;}
+    if(h.unit&&!h.ready&&i!==selUnit)toast(UNAME[h.unit]+' : a déjà agi ce tour');
+    const changed=G.provOf[i]!==G.provOf[sel];
+    sel=i;selUnit=-1;if(changed)mode=null;refreshTargets();ui();return;
+  }
+  if(h.owner>=0&&!foe(h.owner,G.cur)){toast('Territoire allié : '+PL[h.owner].name);return;}
+  if((selUnit>=0||(mode&&mode.k==='unit'))&&h.owner>=0){
+    const L=selUnit>=0?G.H[selUnit].unit:mode.l,d=defense(i);
+    if(!(L>d||L===4)){toast('Défense '+d+' : il faut un soldat de niveau '+Math.min(4,d+1));return;}
+    toast('Trop loin de votre province');return;
+  }
+  if(h.owner>=0)toast(PL[h.owner].name+(isAI(h.owner)?' (ordinateur)':'')+' · défense '+defense(i));
+  selUnit=-1;mode=null;refreshTargets();ui();
+}
+
+/* ═════════ Interface ═════════ */
+const $=id=>document.getElementById(id);
+let toastT=0;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),1800);}
+function ui(){
+  if(!G||HEADLESS)return;
+  refreshWarns();
+  const P=PL[G.cur],ai=isAI(G.cur),pr=provAt(sel),hasP=!!(pr&&pr.p===G.cur&&pr.town>=0)&&!G.over&&!ai;
+  document.documentElement.style.setProperty('--pc',P.base);
+  $('pName').textContent=P.name+(ai?' ('+styleName(G.cur)+')':'');$('turnNo').textContent='Tour '+G.turn+'/'+maxT();
+  if(hasP){const inc=provIncome(pr);$('goldV').textContent=G.H[pr.town].money;$('inc').textContent=(inc>=0?'+':'')+inc;$('inc').className=inc<0?'neg':'pos';}
+  else{$('goldV').textContent='—';$('inc').textContent='';}
+  const c=counts();
+  $('chips').classList.toggle('many',present().length>4);
+  $('chips').innerHTML=present().map(p=>'<span class="chip'+(p===G.cur&&!G.over?' cur':'')+(alive(p)?'':' dead')+'"><i style="background:'+PL[p].base+'"></i>'+Math.round(c[p]/G.landN*100)+'%'+(isAI(p)?'<small>IA</small>':'')+'</span>').join('');
+  const ul=mode&&mode.k==='unit'?mode.l:1,tl=mode&&mode.k==='tower'?mode.l:1;
+  const bu=$('tUnit'),bt=$('tTower'),bf=$('tFarm');
+  bu.querySelector('b').textContent=UNAME[ul];bu.querySelector('em').textContent=UCOST[ul];
+  bt.querySelector('b').textContent=tl===2?'Forteresse':'Tour';bt.querySelector('em').textContent=tl===2?TOW.tower2.cost:TOW.tower.cost;
+  bf.querySelector('em').textContent=hasP?farmCost(pr):FARM_BASE;
+  bu.classList.toggle('on',!!mode&&mode.k==='unit');bt.classList.toggle('on',!!mode&&mode.k==='tower');bf.classList.toggle('on',!!mode&&mode.k==='farm');
+  const bpt=$('tPort');bpt.hidden=!G.sea;document.querySelector('footer').classList.toggle('sea',!!G.sea);bpt.classList.toggle('on',!!mode&&mode.k==='port');bpt.disabled=!hasP;
+  [bu,bt,bf].forEach(b=>b.disabled=!hasP);
+  $('tUndo').disabled=!undo.length||G.over||ai;$('tEnd').disabled=G.over||ai;
+  paintIcons(P,ul,tl);
+  let hint='Touchez votre territoire';
+  if(G.over)hint='Partie terminée';
+  else if(ai)hint=P.name+' ('+styleName(G.cur)+') réfléchit… touchez pour accélérer';
+  else if(selUnit>=0)hint=targets.size?UNAME[G.H[selUnit].unit]+' : touchez une case claire':'Aucun déplacement possible';
+  else if(mode&&hasP){const cost=modeCost(pr);hint=G.H[pr.town].money<cost?"Pas assez d'or ("+cost+')':targets.size?(mode.k==='port'?'Touchez une case au bord de l\'eau':'Touchez une case claire pour placer'):'Aucune case possible ici';}
+  else if(hasP&&willFail(pr)){const d=G.H[pr.town].money+provIncome(pr),n=layoffPlan(pr,-d).length;hint='⚠ Faillite au prochain tour ('+d+' or) : '+n+' soldat'+(n>1?'s':'')+' licencié'+(n>1?'s':'');}
+  else if(hasP)hint=G.H.some(h=>h.owner===G.cur&&h.ready&&h.unit)?'Soldats prêts : ils sautillent':'Achetez en bas, ou finissez le tour';
+  $('hint').textContent=hint;
+}
+function paintIcons(P,ul,tl){
+  // les fonctions de dessin utilisent ctx : on le redirige brièvement vers l'icône
+  const run=(id,fn)=>{const g=$(id).querySelector('canvas').getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,60,60);const m=ctx;ctx=g;try{fn();}finally{ctx=m;}};
+  run('tUnit',()=>dUnit(30,34,54,P,ul,false,0,0));
+  run('tTower',()=>tl===2?dTower(30,40,45,P,true):dTower(30,33,56,P,false));
+  run('tFarm',()=>dFarm(30,30,62));
+  if(G.sea)run('tPort',()=>dPort(26,34,52,P));
+}
+
+/* boutons */
+const myTurn=()=>G&&!G.over&&!isAI(G.cur);
+function needProv(){const pr=provAt(sel);if(!pr||pr.p!==G.cur||pr.town<0){toast("Touchez d'abord une de vos provinces");return null;}return pr;}
+$('tUnit').onclick=()=>{if(!myTurn()||!needProv())return;selUnit=-1;mode=mode&&mode.k==='unit'?{k:'unit',l:mode.l%4+1}:{k:'unit',l:1};refreshTargets();ui();};
+$('tTower').onclick=()=>{if(!myTurn()||!needProv())return;selUnit=-1;mode=mode&&mode.k==='tower'?(mode.l===1?{k:'tower',l:2}:null):{k:'tower',l:1};refreshTargets();ui();};
+$('tPort').onclick=()=>{if(!myTurn()||!needProv())return;selUnit=-1;mode=mode&&mode.k==='port'?null:{k:'port',l:1};refreshTargets();ui();};
+$('tFarm').onclick=()=>{if(!myTurn()||!needProv())return;selUnit=-1;mode=mode&&mode.k==='farm'?null:{k:'farm',l:1};refreshTargets();ui();};
+$('tUndo').onclick=()=>{if(!myTurn()||!undo.length)return;restore(undo.pop());selUnit=-1;mode=null;refreshTargets();save();ui();};
+$('tEnd').onclick=()=>{if(!myTurn())return;const ready=G.H.filter(h=>h.owner===G.cur&&h.unit&&h.ready).length;
+  if(ready&&!G.__warned){G.__warned=true;toast(ready+' soldat'+(ready>1?'s':'')+" n'a pas bougé · touchez encore pour finir");return;}
+  G.__warned=false;safeEnd();};
+$('bMenu').onclick=()=>showPause();
+
+/* ═════════ Écrans ═════════ */
+const ov=$('ov'),card=$('card');
+function show(html,cls,bg){card.className='card '+(cls||'');card.style.background=bg||'';card.innerHTML=html;ov.classList.add('on');}
+function hide(){ov.classList.remove('on');}
+const LOGO='<svg class="logo" viewBox="0 0 180 110" aria-hidden="true">'+[[40,40,'#4f8fe8'],[70,40,'#4f8fe8'],[55,66,'#9a6fd8'],[110,40,'#ebe3cc'],[85,66,'#ebe3cc'],[115,66,'#e6ad2e'],[140,40,'#e5604f'],[100,92,'#e5604f']].map(([x,y,c])=>'<polygon points="'+[0,1,2,3,4,5].map(k=>{const a=Math.PI/180*(60*k-30);return (x+17*Math.cos(a)).toFixed(1)+','+(y+17*Math.sin(a)).toFixed(1);}).join(' ')+'" fill="'+c+'" stroke="#fbf7ee" stroke-width="3"/>').join('')+'</svg>';
+const SLOT={human:'Humain',ai:'Ordinateur',none:'Absent'};
+const MAPS=[['continent','Continent','terres reliées'],['archipel','Archipel','îles, ports'],['lacs','Lacs','passages étroits'],['atoll','Atoll','anneau, ports'],['foret','Forêt','arbres partout']];
+const LEVELS=[['facile','Facile','fait des erreurs'],['moyen','Moyen','2 styles'],['difficile','Difficile','optimisé']];
+function showMenu(){
+  clearTimeout(aiTimer);
+  const sz=[['s','Petite','11×17'],['m','Moyenne','15×25'],['l','Grande','19×33']];
+  const pres=cfg.players.filter((x,p)=>x!=='none'&&(p<4||menuSize==='l')),mixed=pres.includes('human')&&pres.includes('ai');
+  show(LOGO+'<h1>Archipel</h1><p class="sub">Conquête d\'îles jusqu\'à 6 camps, sur le même téléphone</p>'+
+    '<div class="seg">'+sz.map(([k,n,d])=>'<button data-size="'+k+'" class="'+(k===menuSize?'on':'')+'">'+n+'<small>'+d+'</small></button>').join('')+'</div>'+
+    '<p class="lbl">Joueurs (touchez pour changer)</p><div class="slots">'+cfg.players.map((x,p)=>{const lock=p>=4&&menuSize!=='l';return '<button class="slot '+(lock?'none lock':x)+'" data-slot="'+p+'"><i style="background:'+PL[p].base+'"></i>'+PL[p].name+'<b>'+(lock?'Grande carte':SLOT[x])+'</b></button>';}).join('')+'</div>'+
+    '<p class="lbl">Carte</p><div class="grid3">'+MAPS.map(([k,n,d])=>'<button data-map="'+k+'" class="'+(cfg.map===k?'on':'')+'">'+n+'<small>'+d+'</small></button>').join('')+'</div>'+
+    '<p class="lbl">Ordinateurs</p><div class="grid3">'+LEVELS.map(([k,n,d])=>'<button data-level="'+k+'" class="'+(cfg.level===k?'on':'')+'">'+n+'<small>'+d+'</small></button>').join('')+'</div>'+
+    (mixed?'<div class="seg"><button data-teams="0" class="'+(cfg.teams?'':'on')+'">Chacun pour soi</button><button data-teams="1" class="'+(cfg.teams?'on':'')+'">Humains contre ordis</button></div>':'')+
+    '<button class="btn main" data-a="new">Nouvelle partie</button>'+
+    (hasSave()?'<button class="btn" data-a="resume">Reprendre la partie</button>':'')+
+    '<button class="btn" data-a="rules">Comment jouer</button>');
+}
+function showRules(back){
+  show('<h2>Comment jouer</h2><ul class="rules">'+
+  '<li><b>Or</b> : chaque case rapporte 1 par tour, sauf sous un arbre. Une ferme, posée à côté de la maison ou d\'une autre ferme, rapporte +4.</li>'+
+  '<li><b>Soldats</b> : Paysan I (10), Lancier II (20), Baron III (30), Chevalier IV (40). Touchez le bouton plusieurs fois pour monter de niveau. Posez un soldat sur un autre pour les fusionner.</li>'+
+  '<li><b>Entretien</b> : 2, 6, 18 et 36 d\'or par tour. Au début de votre tour, si l\'or d\'une province tombe sous 0, elle licencie juste assez de soldats pour couvrir le déficit (en perdant le moins possible), et ils deviennent des arbres. Si elle reste dans le rouge, elle en perd encore au tour suivant. Une pastille rouge « ! » sur une maison prévient la faillite au prochain tour.</li>'+
+  '<li><b>Isolement</b> : un soldat seul sur une case (coupé de toute province) tient un tour. S\'il est encore seul au début de votre tour suivant, il meurt. Une pastille rouge prévient quand c\'est son dernier tour.</li>'+
+  '<li><b>Attaque</b> : un soldat se déplace jusqu\'à 4 cases dans sa province, puis peut prendre une case voisine. Il doit dépasser sa défense : maison 1, tour 2, forteresse 3, ou le soldat le plus fort sur la case et autour. Le chevalier bat tout.</li>'+
+  '<li><b>Provinces</b> : couper une province en deux ruine la partie sans maison. Prendre la maison adverse vole son or.</li>'+
+  '<li><b>Archipel</b> : construisez un port (20 or, au bord de l\'eau). Tout soldat de la province, ou un soldat que vous achetez, peut alors traverser jusqu\'à 6 cases de mer et débarquer d\'un coup. Une case débarquée seule n\'a pas de maison : prenez une case voisine au tour suivant pour fonder une province.</li>'+
+  '<li><b>Équipes</b> : en mode « Humains contre ordis », on ne peut pas attaquer son allié et les terres de l\'équipe s\'additionnent.</li>'+
+  '<li><b>Victoire</b> : 60 % des terres (en équipe, ou à 2 joueurs), 50 % à 3 ou 4 chacun pour soi, 40 % à 5 ou 6, ou éliminer tous les adversaires. Sinon, après 40, 50 ou 60 tours selon la taille de la carte, le plus grand territoire gagne.</li>'+
+  '<li><b>Ordinateurs</b> : ils alternent deux styles, bâtisseur (tours, défense) puis équilibré (plus offensif).</li>'+
+  '<li><b>Cartes</b> : Continent (terres reliées), Archipel (îles, ports indispensables), Lacs (terre coupée de lacs : passages étroits faciles à défendre), Atoll (anneau autour d\'une mer intérieure : ports pour couper au court), Forêt (arbres partout : économie lente, il faut défricher).</li>'+
+  '<li><b>Niveaux</b> : Facile (fait des erreurs, joue peu de coups), Moyen (deux styles, bâtisseur et équilibré), Difficile (poids optimisés par tournoi).</li>'+
+  '<li><b>5 ou 6 joueurs</b> : grande carte uniquement, les camps sont placés en anneau.</li>'+
+  '<li>Glissez pour bouger la carte, pincez pour zoomer. Pendant le tour d\'un ordinateur, touchez l\'écran pour accélérer.</li></ul>'+
+  '<button class="btn main" data-a="'+back+'">Retour</button>');
+}
+function showPause(){
+  show('<h2>Pause</h2><p class="sub">Tour '+(G?G.turn:1)+(G?' · objectif '+Math.round(goal()*100)+' % des terres'+(G.teams?' en équipe':''):'')+'</p><button class="btn main" data-a="close">Reprendre</button><button class="btn" data-a="stats">Statistiques</button><button class="btn" data-a="rules2">Comment jouer</button><button class="btn" data-a="center">Voir toute la carte</button><button class="btn" data-a="quit">Menu principal</button>');
+}
+function handoff(rep,deltas){
+  const P=PL[G.cur];
+  let txt=rep?'Revenu '+(rep.inc>=0?'+':'')+rep.inc+' · Or '+rep.gold:'';
+  show('<h2>Au tour de '+P.name+'</h2><p class="sub">Tour '+G.turn+' sur '+maxT()+'</p>'+(txt?'<p>'+txt+'</p>':'')+
+    (rep&&rep.lost?'<p><b>Faillite :</b> '+rep.lost+' soldat'+(rep.lost>1?'s':'')+' licencié'+(rep.lost>1?'s':'')+'</p>':'')+
+    (rep&&rep.iso?'<p><b>Isolés :</b> '+rep.iso+' soldat'+(rep.iso>1?'s':'')+' mort'+(rep.iso>1?'s':'')+', restés seuls deux tours</p>':'')+
+    (()=>{const w=myWarns();return w?'<p>'+w.trim()+'</p>':'';})()+
+    (deltas?'<p class="sub">Depuis votre dernier tour : '+deltas+' cases</p>':'')+
+    '<p class="sub">Objectif : '+Math.round(goal()*100)+' % des terres'+(G.teams?' en équipe':'')+'</p>'+
+    '<button class="btn" data-a="close">Jouer</button>','hand',P.base);
+}
+function showWin(){
+  if(!G||!G.over)return;
+  const pres=present(),win=pres.filter(p=>team(p)===G.winTeam),names=win.map(p=>PL[p].name);
+  const title=names.length>1?names.join(' et ')+' gagnent !':names[0]+' gagne !';
+  const sub=(win.every(isAI)&&pres.some(p=>!isAI(p))?'Les ordinateurs l\'emportent, en ':'en ')+G.turn+' tours'+(G.limit?' · limite atteinte, plus grand territoire':'');
+  showStats({title,sub,bg:PL[win[0]].base});
+}
+function showStats(head){
+  const pres=present(),c=counts(),N=G.landN,pct=v=>Math.round(v/N*100);
+  const h=head||{title:'Statistiques',sub:'Tour '+G.turn,bg:PL[G.cur].base};
+  const rows=[[G.over?'Terres finales':'Terres actuelles',p=>pct(c[p])+' %',p=>c[p]],['Terres max',p=>pct(G.st[p].peak)+' %',p=>G.st[p].peak],
+    ['Cases prises',p=>G.st[p].cap],['Maisons prises',p=>G.st[p].towns],['Soldats vaincus',p=>G.st[p].kills],
+    ['Soldats achetés',p=>G.st[p].bought],['Perdus (faillite, isolés)',p=>G.st[p].lost,null,true],['Or gagné',p=>G.st[p].gold],
+    ['Fermes',p=>G.st[p].farms],['Tours',p=>G.st[p].towers]].concat(G.sea?[['Ports',p=>G.st[p].ports],['Débarquements',p=>G.st[p].lands]]:[]);
+  const tbl='<div class="tw"><table class="st"><thead><tr><th></th>'+pres.map(p=>'<th><i style="background:'+PL[p].line+'"></i>'+PL[p].name+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(([lab,f,k,low])=>{const v=pres.map(p=>(k||f)(p)),best=low?Math.min(...v):Math.max(...v);
+      return '<tr><td>'+lab+'</td>'+pres.map((p,i)=>'<td'+(v[i]===best&&v.some(x=>x!==best)?' style="font-weight:700"':'')+'>'+f(p)+'</td>').join('')+'</tr>';}).join('')+'</tbody></table></div>';
+  show('<div class="band" style="background:'+h.bg+'"><h2>'+h.title+'</h2><p>'+h.sub+'</p></div><div class="in">'+
+    '<h3>Territoire par tour</h3>'+(pres.length>4?
+      '<div class="leg"><span>Une courbe par joueur, les autres en gris ; touchez pour lire un tour</span><span><i style="background:repeating-linear-gradient(90deg,#8a8f98 0 4px,transparent 4px 7px)"></i>Objectif</span></div><div class="mult" id="mult"></div>':
+      '<div class="leg">'+pres.map(p=>'<span><i style="background:'+PL[p].line+'"></i>'+PL[p].name+(isAI(p)?' (IA)':'')+'</span>').join('')+
+      '<span><i style="background:repeating-linear-gradient(90deg,#8a8f98 0 4px,transparent 4px 7px)"></i>Objectif</span></div>'+
+      '<div class="chart" id="chart"><svg id="chs"></svg><div class="tip" id="tip"></div></div>')+
+    '<h3>Bilan</h3>'+tbl+'</div><div class="btns">'+
+    (G.over?'<button class="btn main" data-a="menu">Nouvelle partie</button><button class="btn" data-a="close">Voir la carte</button>':'<button class="btn main" data-a="pause">Retour</button>')+
+    '</div>','stats');
+  if(pres.length>4)drawMultiples(pres);else drawChart(pres);
+}
+// 5-6 joueurs : petits multiples (une courbe colorée par panneau, les autres en gris), lecture synchronisée au toucher
+function drawMultiples(pres){
+  const box=$('mult');if(!box)return;
+  const hs=G.hist.length?G.hist:[{t:G.turn,c:counts()}],N=G.landN;
+  const top=Math.min(100,Math.max(Math.ceil((goal()*100+5)/10)*10,...hs.flatMap(e=>pres.map(p=>Math.ceil(e.c[p]/N*10)*10))));
+  box.innerHTML=pres.map(p=>'<div><div class="mh"><i style="background:'+PL[p].line+'"></i><span>'+PL[p].name+'</span>'+(isAI(p)?'<small>IA</small>':'')+'<b id="mv'+p+'"></b></div><svg data-p="'+p+'"></svg></div>').join('');
+  const svgs=[...box.querySelectorAll('svg')];
+  const paint=k=>{
+    svgs.forEach(sv=>{
+      const p=+sv.dataset.p,W=sv.clientWidth,H=sv.clientHeight,pad=3;
+      const X=i=>hs.length<2?W/2:i*(W-2*pad)/(hs.length-1)+pad,Y=v=>H-pad-(v/top)*(H-2*pad);
+      const line=q=>hs.map((e,i)=>X(i).toFixed(1)+','+Y(e.c[q]/N*100).toFixed(1)).join(' ');
+      let o='<line x1="0" x2="'+W+'" y1="'+(H-pad)+'" y2="'+(H-pad)+'" stroke="#e6dfcf"/><line x1="0" x2="'+W+'" y1="'+Y(goal()*100)+'" y2="'+Y(goal()*100)+'" stroke="#8a8f98" stroke-dasharray="4 3"/>';
+      pres.forEach(q=>{if(q!==p)o+='<polyline points="'+line(q)+'" fill="none" stroke="#d6cfbf" stroke-width="1.2"/>';});
+      o+='<polyline points="'+line(p)+'" fill="none" stroke="'+PL[p].line+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      const i=k===null?hs.length-1:k;
+      o+='<circle cx="'+X(i)+'" cy="'+Y(hs[i].c[p]/N*100)+'" r="3.5" fill="'+PL[p].line+'" stroke="#fbf7ee" stroke-width="1.5"/>';
+      if(k!==null)o+='<line x1="'+X(k)+'" x2="'+X(k)+'" y1="0" y2="'+H+'" stroke="#2a3340" opacity=".35"/>';
+      sv.innerHTML=o;
+      $('mv'+p).textContent=Math.round(hs[i].c[p]/N*100)+' %'+(k===null?'':' · t'+hs[k].t);
+    });
+  };
+  paint(null);
+  const pick=e=>{const sv=e.target.closest('svg');if(!sv)return;const r=sv.getBoundingClientRect(),x=e.clientX-r.left;
+    paint(Math.max(0,Math.min(hs.length-1,Math.round(x/(r.width/Math.max(1,hs.length-1))))));};
+  box.addEventListener('pointermove',pick);box.addEventListener('pointerdown',pick);box.addEventListener('pointerleave',()=>paint(null));
+}
+function drawChart(pres){
+  const box=$('chart'),svg=$('chs'),tip=$('tip');if(!box)return;
+  const W=box.clientWidth,H=box.clientHeight,ml=30,mr=50,mt=8,mb=22,pw=W-ml-mr,ph=H-mt-mb;
+  const hs=G.hist.length?G.hist:[{t:G.turn,c:counts()}],N=G.landN;
+  const top=Math.min(100,Math.max(Math.ceil((goal()*100+5)/10)*10,...hs.flatMap(e=>pres.map(p=>Math.ceil(e.c[p]/N*10)*10))));
+  const X=k=>ml+(hs.length<2?pw/2:k*pw/(hs.length-1)),Y=v=>mt+ph-(v/top)*ph;
+  let o='';
+  for(let g=0;g<=top;g+=top>60?20:10)o+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+Y(g)+'" y2="'+Y(g)+'" stroke="#e6dfcf"/><text x="'+(ml-6)+'" y="'+(Y(g)+4)+'" text-anchor="end" font-size="11" fill="#7a7f87">'+g+'</text>';
+  const gy=Y(goal()*100);
+  o+='<line x1="'+ml+'" x2="'+(W-mr)+'" y1="'+gy+'" y2="'+gy+'" stroke="#8a8f98" stroke-width="1.5" stroke-dasharray="4 3"/>';
+  [0,hs.length-1].filter((v,i,a)=>a.indexOf(v)===i).forEach(k=>{o+='<text x="'+X(k)+'" y="'+(H-4)+'" text-anchor="middle" font-size="11" fill="#7a7f87">tour '+hs[k].t+'</text>';});
+  const ends=[];
+  pres.forEach(p=>{
+    const pts=hs.map((e,k)=>X(k).toFixed(1)+','+Y(e.c[p]/N*100).toFixed(1)).join(' ');
+    o+='<polyline points="'+pts+'" fill="none" stroke="'+PL[p].line+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    const last=hs[hs.length-1].c[p]/N*100;
+    o+='<circle cx="'+X(hs.length-1)+'" cy="'+Y(last)+'" r="4" fill="'+PL[p].line+'" stroke="#fbf7ee" stroke-width="2"/>';
+    ends.push({p,y:Y(last),v:Math.round(last)});
+  });
+  // étiquettes de fin sans chevauchement, gardées dans le cadre
+  ends.sort((a,b)=>a.y-b.y);for(let k=1;k<ends.length;k++)if(ends[k].y-ends[k-1].y<14)ends[k].y=ends[k-1].y+14;
+  const over=ends.length?ends[ends.length-1].y-(mt+ph):0;if(over>0)ends.forEach(e=>e.y-=over);
+  ends.forEach(e=>{o+='<circle cx="'+(W-mr+10)+'" cy="'+e.y+'" r="3.5" fill="'+PL[e.p].line+'"/><text x="'+(W-mr+17)+'" y="'+(e.y+4)+'" font-size="12" font-weight="600" fill="#2a3340">'+e.v+'%</text>';});
+  o+='<line id="cx" y1="'+mt+'" y2="'+(mt+ph)+'" stroke="#2a3340" stroke-width="1" opacity="0"/><rect x="'+ml+'" y="0" width="'+pw+'" height="'+H+'" fill="transparent" id="hit"/>';
+  svg.innerHTML=o;
+  const cx=svg.querySelector('#cx'),hit=svg.querySelector('#hit');
+  const move=e=>{
+    const r=box.getBoundingClientRect(),x=e.clientX-r.left,k=Math.max(0,Math.min(hs.length-1,Math.round((x-ml)/(pw/Math.max(1,hs.length-1)))));
+    cx.setAttribute('x1',X(k));cx.setAttribute('x2',X(k));cx.setAttribute('opacity','.5');
+    tip.innerHTML='<b>Tour '+hs[k].t+'</b><br>'+pres.slice().sort((a,b)=>hs[k].c[b]-hs[k].c[a]).map(p=>'<i style="background:'+PL[p].line+'"></i>'+PL[p].name+' '+Math.round(hs[k].c[p]/N*100)+' %').join('<br>');
+    tip.style.display='block';const tw=tip.offsetWidth;tip.style.left=Math.max(0,Math.min(W-tw,X(k)+(X(k)>W/2?-tw-10:10)))+'px';
+  };
+  const out=()=>{cx.setAttribute('opacity','0');tip.style.display='none';};
+  hit.addEventListener('pointermove',move);hit.addEventListener('pointerdown',move);hit.addEventListener('pointerleave',out);
+}
+ov.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.size){menuSize=b.dataset.size;showMenu();return;}
+  if(b.dataset.slot){
+    const p=+b.dataset.slot,order=['human','ai','none'];
+    if(p>=4&&menuSize!=='l'){menuSize='l';if(cfg.players[p]==='none')cfg.players[p]='ai';showMenu();return;}   // 5 et 6 : grande carte
+    let nx=order[(order.indexOf(cfg.players[p])+1)%3];
+    const others=cfg.players.filter((x,k)=>k!==p&&x!=='none'&&(k<4||menuSize==='l')).length;
+    if(nx==='none'&&others<1)nx='human';
+    cfg.players[p]=nx;showMenu();return;
+  }
+  if(b.dataset.teams){cfg.teams=b.dataset.teams==='1';showMenu();return;}
+  if(b.dataset.map){cfg.map=b.dataset.map;showMenu();return;}
+  if(b.dataset.level){cfg.level=b.dataset.level;showMenu();return;}
+  const a=b.dataset.a;
+  if(a==='new')startNew();
+  else if(a==='resume')resume();
+  else if(a==='rules')showRules('menu');
+  else if(a==='rules2')showRules('pause');
+  else if(a==='stats')showStats(null);
+  else if(a==='win')showWin();
+  else if(a==='menu')showMenu();
+  else if(a==='pause')showPause();
+  else if(a==='close')hide();
+  else if(a==='center'){hide();centerOn(-1,true);}
+  else if(a==='quit'){save();showMenu();}
+});
+function launch(rep){
+  resize();ui();save();
+  if(isAI(G.cur)){sel=-1;centerOn(-1,true);hide();ui();startAI();}
+  else{centerOn(sel);humanStart(rep);}
+}
+function startNew(){
+  clearTimeout(aiTimer);undo=[];
+  G=genGame(menuSize,cfg);calcPos();computeProvs();record();
+  launch(beginTurn());
+}
+function resume(){
+  clearTimeout(aiTimer);
+  const d=loadSave();if(!d){startNew();return;}
+  const {o,g}=d;let landN=0;g.H.forEach(h=>{if(h.land)landN++;});
+  G={C:o.C,R:o.R,H:g.H,nb:g.nb,landN,cur:o.cur,turn:o.turn,over:false,size:o.size,players:o.players,teams:o.teams,sea:!!o.sea,map:o.map||(o.sea?'archipel':'continent'),level:o.level||'moyen',last:o.last,hist:o.hist||[],st:newStats()};
+  calcPos();restore(o.s);undo=[];selUnit=-1;mode=null;targets=new Map();
+  if(sel<0||G.H[sel].owner!==G.cur){const pr=G.provs.find(p=>p.p===G.cur&&p.town>=0);sel=pr?pr.town:-1;}
+  resize();ui();
+  if(isAI(G.cur)){sel=-1;hide();ui();startAI();}else{centerOn(sel);handoff(null,'');}
+}
+
+let lastErr=0;
+function report(err){
+  const m=(err&&err.message)||String(err);
+  if(Date.now()-lastErr>4000){lastErr=Date.now();try{toast('Erreur : '+m.slice(0,80));}catch(e){}}
+  try{console.error(err);}catch(e){}
+}
+window.addEventListener('error',e=>report(e.error||e.message));
+window.addEventListener('resize',()=>{resize();});
+resize();requestAnimationFrame(draw);showMenu();
+window.__A={get AIW_F(){return AIW_F},setAIWD:w=>{AIW_D=w},layoffPlan,get warns(){refreshWarns();return warns},willFail,AIW_B,AIW_E,econThreat,AIW0,setAIW:w=>{AIW=w},setHeadless:v=>{HEADLESS=v},get targets(){return targets},threatAt,capScore,landScore,defense,moveUnit,buy,get sel(){return sel},set sel(v){sel=v},get mode(){return mode},set mode(v){mode=v},get G(){return G},set G(v){G=v},aiStep,endTurn,beginTurn,checkWin,counts,alive,present,unitTargets,buyTargets,provAt,provIncome,computeProvs,startNew,cfg,setSize:v=>menuSize=v,get aiFast(){return aiFast},set aiFast(v){aiFast=v},stopAI:()=>clearTimeout(aiTimer),cam,WXY:()=>[WX,WY]};
+}
+</script>
+</body>
+</html>
